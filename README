@@ -5,9 +5,10 @@ Version: 0.1
 License: The MIT License
 
 ==============================================================================
-概要                                        *simplefinder-readme-introduction*
+INTRODUCTION                                *simplefinder-readme-introduction*
 
-
+ see doc/*.jax
+ 
 
 ==============================================================================
 BUGS                                                *simplefinder-readme-bugs*

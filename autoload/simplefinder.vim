@@ -300,7 +300,21 @@ endfunction
 
 
 function! simplefinder#command_complete(arglead, cmdline, cursorpos)
-  return join(['buffer', 'file'], "\n")
+  return join(
+        \  sort(
+        \    map(
+        \      split(
+        \        globpath(
+        \          &runtimepath,
+        \          'autoload/simplefinder/*.vim'
+        \        ),
+        \        "\n"
+        \      ),
+        \      'fnamemodify(v:val, ":t:r")'
+        \    )
+        \  ),
+        \  "\n"
+        \)
 endfunction
 
 
