@@ -1,0 +1,84 @@
+*simplefinder-file.txt*  simplefinder ファイルモード
+
+Author: ky <ky.vim13@gmail.com>
+Version: 0.1
+License: The MIT License
+The MIT License {{{
+
+Copyright (C) 2008 ky
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+}}}
+
+
+==============================================================================
+目次
+
+概要			|simplefinder-file-introduction|
+操作方法		|simplefinder-file-usage|
+
+
+==============================================================================
+概要                      *simplefinder-file-introduction* *simplefinder-file*
+
+ファイルモードです。
+以下のコマンドで起動します。 >
+
+      :SimpleFinder file
+
+
+==============================================================================
+操作方法                                             *simplefinder-file-usage*
+
+機動すると相対パスモードになり、カレントのファイル一覧がポップアップメニューに
+表示されます(補完候補)。文字を入力すると曖昧パターンに展開され、パターンには
+マッチした保管候補が表示されます。
+
+1文字目に"/"を入力すると絶対パスモードになります。
+Note:ウィンドウズの場合は"\"でも同様です。絶対パスモードになったときは
+カレントディレクトリのドライブの一覧が表示されます。
+ドライブを変更したい場合、ドライブを直接指定してください。例： >
+
+	file>c:\
+
+環境変数と"~"が使用できます。"/"を入力すると展開され、
+保管候補が表示されます。例： >
+
+	file>~/.vimrc
+        file>$HOME/.vimrc
+
+保管候補には"."から始まるフォルダ/ファイルは表示されません。
+表示したい場合は"."を入力してください。
+
+特殊文字として"?"、"**"があります。"?"は何か1文字にマッチします。
+"**"はパターンにマッチするすべてのディレクトリを再帰的に展開します。
+Note: ウィンドウズの場合、"/"を入力すると"/"または"\"にマッチします。
+同様に"\"を入力すると"/"または"\"にマッチします。
+
+
+<CR>			選択したファイルをオープンします。
+
+<BS>			入力された文字を1文字削除します。
+
+<C-c>		または
+<Esc>			終了します。
+
+
+==============================================================================
+ vim:tw=78:ts=8:ft=help:norl:fdm=marker:

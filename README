@@ -1,0 +1,18 @@
+*simplefinder-readme*    README : simplefinder
+
+Author: ky <ky.vim13@gmail.com>
+Version: 0.1
+License: The MIT License
+
+==============================================================================
+概要                                        *simplefinder-readme-introduction*
+
+
+
+==============================================================================
+BUGS                                                *simplefinder-readme-bugs*
+
+  英語ドキュメントは書けません。
+
+
+ vim:tw=78:ts=8:ft=help:norl:fdm=marker:
