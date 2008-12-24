@@ -1,5 +1,5 @@
 "-----------------------------------------------------------------------------
-" simplefinder
+" smartfinder
 " Author: ky
 " Version: 0.1
 " License: The MIT License
@@ -28,9 +28,9 @@
 "-----------------------------------------------------------------------------
 
 if has('win16') || has('win32') || has('win64')
-  let s:BUFNAME = '[simplefinder]'
+  let s:BUFNAME = '[smartfinder]'
 else
-  let s:BUFNAME = '*simplefinder*'
+  let s:BUFNAME = '*smartfinder*'
 endif
 
 let s:prompt = ''
@@ -47,11 +47,11 @@ let s:mode_name = ''
 
 
 function! s:do(function_name, ...)
-  return call(printf('simplefinder#%s#%s', s:mode_name, a:function_name), a:000)
+  return call(printf('smartfinder#%s#%s', s:mode_name, a:function_name), a:000)
 endfunction
 
 
-function! simplefinder#start(mode_name)
+function! smartfinder#start(mode_name)
   let s:mode_name = a:mode_name
 
   call s:init()
@@ -68,7 +68,7 @@ function! simplefinder#start(mode_name)
     call s:init_buf()
   endif
 
-  call simplefinder#map_plugin_keys()
+  call smartfinder#map_plugin_keys()
   call s:do('map_default_keys')
 
   silent % delete _
@@ -76,7 +76,7 @@ function! simplefinder#start(mode_name)
 endfunction
 
 
-function! simplefinder#end()
+function! smartfinder#end()
   if s:activate_flag
     call s:term()
   endif
@@ -110,7 +110,7 @@ function! s:term()
   endif
 
   call s:do('unmap_default_keys')
-  call simplefinder#unmap_plugin_keys()
+  call smartfinder#unmap_plugin_keys()
 
   close
   execute s:winnr . 'wincmd w'
@@ -125,23 +125,23 @@ function! s:init_buf()
   setlocal nobuflisted
   setlocal buftype=nofile
   setlocal noswapfile
-  setlocal omnifunc=simplefinder#omnifunc
-  setlocal filetype=simplefinder
+  setlocal omnifunc=smartfinder#omnifunc
+  setlocal filetype=smartfinder
 
   " :help `=
   silent file `=s:BUFNAME`
 
   augroup SimplefinderAugroup
     autocmd!
-    autocmd InsertLeave <buffer> call simplefinder#end()
-    autocmd WinLeave <buffer> call simplefinder#end()
-    autocmd BufLeave <buffer> call simplefinder#end()
+    autocmd InsertLeave <buffer> call smartfinder#end()
+    autocmd WinLeave <buffer> call smartfinder#end()
+    autocmd BufLeave <buffer> call smartfinder#end()
     autocmd CursorMovedI <buffer> call s:on_cursor_moved_i()
   augroup END
 endfunction
 
 
-function! simplefinder#error_msg(msg)
+function! smartfinder#error_msg(msg)
   echohl ErrorMsg
   echomsg a:msg
   echohl None
@@ -193,37 +193,38 @@ function! s:on_cursor_moved_i()
 endfunction
 
 
-function! simplefinder#on_bs()
+function! smartfinder#on_bs()
   if strlen(s:remove_prompt(getline('.'))) > 0
     call feedkeys((pumvisible() ? "\<C-e>" : '') . "\<BS>", 'n')
   endif
 endfunction
 
 
-function! simplefinder#map_plugin_keys()
+function! smartfinder#map_plugin_keys()
   inoremap <buffer> <Plug>SimplefinderOnBS
-        \ <C-r>=simplefinder#on_bs() ? '' : ''<CR>
+        \ <C-r>=smartfinder#on_bs() ? '' : ''<CR>
   inoremap <buffer> <Plug>SimplefinderCancel <Esc>
 
   call s:do('map_plugin_keys')
 endfunction
 
 
-function! simplefinder#unmap_plugin_keys()
+function! smartfinder#unmap_plugin_keys()
   call s:do('unmap_plugin_keys')
-  call simplefinder#safe_iunmap('<Plug>SimplefinderOnBS',
+  call smartfinder#safe_iunmap('<Plug>SimplefinderOnBS',
         \                       '<Plug>SimplefinderCancel')
 endfunction
 
 
-function! simplefinder#map_default_keys()
+function! smartfinder#map_default_keys()
   imap <buffer> <BS> <Plug>SimplefinderOnBS
+  imap <buffer> <Esc> <Plug>SimplefinderCancel
   imap <buffer> <C-c> <Plug>SimplefinderCancel
   inoremap <buffer> <C-l> <Nop>
 endfunction
 
 
-function! simplefinder#safe_iunmap(...)
+function! smartfinder#safe_iunmap(...)
   for key in a:000
     execute 'inoremap <buffer> ' . key . ' <Nop>'
     execute 'iunmap <buffer> ' . key
@@ -231,12 +232,12 @@ function! simplefinder#safe_iunmap(...)
 endfunction
 
 
-function! simplefinder#unmap_default_keys()
-  call simplefinder#safe_iunmap('<BS>', '<C-c>', '<C-l>')
+function! smartfinder#unmap_default_keys()
+  call smartfinder#safe_iunmap('<BS>', '<Esc>', '<C-c>', '<C-l>')
 endfunction
 
 
-function! simplefinder#omnifunc(findstart, base)
+function! smartfinder#omnifunc(findstart, base)
   if a:findstart
     return s:do('omnifunc', a:findstart, a:base)
   endif
@@ -280,8 +281,8 @@ function! s:get_select_item(str)
 endfunction
 
 
-function! simplefinder#action_handler(function_name)
-  if !s:get_user_input_string('simplefinder#action_handler', a:function_name)
+function! smartfinder#action_handler(function_name)
+  if !s:get_user_input_string('smartfinder#action_handler', a:function_name)
     return
   endif
 
@@ -299,14 +300,14 @@ function! simplefinder#action_handler(function_name)
 endfunction
 
 
-function! simplefinder#command_complete(arglead, cmdline, cursorpos)
+function! smartfinder#command_complete(arglead, cmdline, cursorpos)
   return join(
         \  sort(
         \    map(
         \      split(
         \        globpath(
         \          &runtimepath,
-        \          'autoload/simplefinder/*.vim'
+        \          'autoload/smartfinder/*.vim'
         \        ),
         \        "\n"
         \      ),

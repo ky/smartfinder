@@ -1,5 +1,5 @@
 "-----------------------------------------------------------------------------
-" simplefinder - file
+" smartfinder - file
 " Author: ky
 " Version: 0.1
 " License: The MIT License
@@ -45,8 +45,8 @@ let s:ACTION_KEY_TABLE = {
       \ 'O' : 'open!',
       \}
 let s:ACTION_NAME_TABLE = {
-      \ 'open'  : 'simplefinder#file#action_open',
-      \ 'open!' : 'simplefinder#file#action_open_f',
+      \ 'open'  : 'smartfinder#file#action_open',
+      \ 'open!' : 'smartfinder#file#action_open_f',
       \}
 
 
@@ -54,18 +54,18 @@ let s:cache_filelist = []
 let s:last_input_string = ''
 
 
-function! simplefinder#file#init()
+function! smartfinder#file#init()
   let s:cache_filelist = []
   let s:last_input_string = ''
 endfunction
 
 
-function! simplefinder#file#get_prompt()
+function! smartfinder#file#get_prompt()
   return s:PROMPT
 endfunction
 
 
-function! simplefinder#file#get_item_list()
+function! smartfinder#file#get_item_list()
   return s:cache_filelist
 endfunction
 
@@ -110,34 +110,32 @@ function! s:make_regex_pattern(str)
 endfunction
 
 
-function! simplefinder#file#map_plugin_keys()
+function! smartfinder#file#map_plugin_keys()
   inoremap <buffer> <Plug>SimplefinderFileOnCR
-        \ <C-r>=simplefinder#action_handler('simplefinder#file#on_cr')
+        \ <C-r>=smartfinder#action_handler('smartfinder#file#on_cr')
         \ ? '' : ''<CR>
   inoremap <buffer> <Plug>SimplefinderFileOnTab
-        \ <C-r>=simplefinder#action_handler('simplefinder#file#on_tab')
+        \ <C-r>=smartfinder#action_handler('smartfinder#file#on_tab')
         \ ? '' : ''<CR>
 endfunction
 
 
-function! simplefinder#file#unmap_plugin_keys()
-  call simplefinder#safe_iunmap('<Plug>SimplefinderFileOnCR',
+function! smartfinder#file#unmap_plugin_keys()
+  call smartfinder#safe_iunmap('<Plug>SimplefinderFileOnCR',
         \                      '<Plug>SimplefinderFileOnTab')
 endfunction
 
 
-function! simplefinder#file#map_default_keys()
-  call simplefinder#map_default_keys()
+function! smartfinder#file#map_default_keys()
+  call smartfinder#map_default_keys()
   imap <buffer> <CR>  <Plug>SimplefinderFileOnCR
   imap <buffer> <Tab> <Plug>SimplefinderFileOnTab
-  "inoremap <buffer> <silent> <CR> <C-r>=simplefinder#action_handler('simplefinder#file#on_cr') ? '' : ''<CR>
-  "inoremap <buffer> <silent> <Tab> <C-r>=simplefinder#action_handler('simplefinder#file#on_tab') ? '' : ''<CR>
 endfunction
 
 
-function! simplefinder#file#unmap_default_keys()
-  call simplefinder#safe_iunmap('<CR>', '<Tab>')
-  call simplefinder#unmap_default_keys()
+function! smartfinder#file#unmap_default_keys()
+  call smartfinder#safe_iunmap('<CR>', '<Tab>')
+  call smartfinder#unmap_default_keys()
 endfunction
 
 
@@ -157,7 +155,7 @@ function! s:create_filename_list(dir_wi, dot_files_flag)
 endfunction
 
 
-function! simplefinder#file#omnifunc(findstart, base)
+function! smartfinder#file#omnifunc(findstart, base)
   if a:findstart
     return strlen(s:PROMPT)
   else
@@ -206,33 +204,33 @@ function! s:action_open(item, bang)
 endfunction
 
 
-function! simplefinder#file#action_open(item)
+function! smartfinder#file#action_open(item)
   return s:action_open(a:item, '')
 endfunction
 
 
-function! simplefinder#file#action_open_f(item)
+function! smartfinder#file#action_open_f(item)
   return s:action_open(a:item, '!')
 endfunction
 
 
-function! simplefinder#file#on_cr(item)
+function! smartfinder#file#on_cr(item)
   if empty(a:item)
-    call simplefinder#error_msg('no input text')
+    call smartfinder#error_msg('no input text')
     return
   endif
 
   let function_name = s:ACTION_NAME_TABLE[s:DEFAULT_ACTION_NAME]
-  call simplefinder#end()
+  call smartfinder#end()
   call feedkeys("\<Esc>", 'n')
   call feedkeys(call(function_name, [a:item]), 'n')
 endfunction
 
 
 " test
-function! simplefinder#file#on_tab(item)
+function! smartfinder#file#on_tab(item)
   if empty(a:item)
-    call simplefinder#error_msg('no input text')
+    call smartfinder#error_msg('no input text')
     return
   endif
 
@@ -280,11 +278,11 @@ function! simplefinder#file#on_tab(item)
   if key != "\<Esc>" && key != "\<C-c>"
     if has_key(s:ACTION_KEY_TABLE, key)
       let function_name = s:ACTION_NAME_TABLE[s:ACTION_KEY_TABLE[key]]
-      call simplefinder#end()
+      call smartfinder#end()
       call feedkeys("\<Esc>", 'n')
       call call(function_name, [a:item])
     else
-      call simplefinder#error_msg('no action')
+      call smartfinder#error_msg('no action')
       return
     endif
   endif

@@ -1,5 +1,5 @@
 "-----------------------------------------------------------------------------
-" simplefinder - buffer
+" smartfinder - buffer
 " Author: ky
 " Version: 0.1
 " License: The MIT License
@@ -43,16 +43,16 @@ let s:ACTION_KEY_TABLE = {
       \ 'D' : 'delete!',
       \}
 let s:ACTION_NAME_TABLE = {
-      \ 'open'    : 'simplefinder#buffer#action_open',
-      \ 'delete'  : 'simplefinder#buffer#action_delete',
-      \ 'delete!' : 'simplefinder#buffer#action_delete_f',
+      \ 'open'    : 'smartfinder#buffer#action_open',
+      \ 'delete'  : 'smartfinder#buffer#action_delete',
+      \ 'delete!' : 'smartfinder#buffer#action_delete_f',
       \}
 
 
 let s:cache_buflist = []
 
 
-function! simplefinder#buffer#init()
+function! smartfinder#buffer#init()
   let last_bufnr = bufnr('$')
   let width = len(last_bufnr)
 
@@ -69,19 +69,17 @@ function! simplefinder#buffer#init()
 	    \ 'dup' : 1,
 	    \ 'bufnr' : i
 	    \})
-	    "\ 'abbr' : printf('[%*d] ', width, i),
-	    "\ 'menu' : bufname,
     endif
   endfor
 endfunction
 
 
-function! simplefinder#buffer#get_prompt()
+function! smartfinder#buffer#get_prompt()
   return s:PROMPT
 endfunction
 
 
-function! simplefinder#buffer#get_item_list()
+function! smartfinder#buffer#get_item_list()
   return s:cache_buflist
 endfunction
 
@@ -111,36 +109,36 @@ function! s:make_pattern(str)
 endfunction
 
 
-function! simplefinder#buffer#map_plugin_keys()
+function! smartfinder#buffer#map_plugin_keys()
   inoremap <buffer> <silent> <Plug>SimplefinderBufferOnCR
-        \ <C-r>=simplefinder#action_handler('simplefinder#buffer#on_cr')
+        \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_cr')
         \ ? '' : ''<CR>
   inoremap <buffer> <silent> <Plug>SimplefinderBufferOnTab
-        \ <C-r>=simplefinder#action_handler('simplefinder#buffer#on_tab')
+        \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_tab')
         \ ? '' : ''<CR>
 endfunction
 
 
-function! simplefinder#buffer#unmap_plugin_keys()
-  call simplefinder#safe_iunmap('<Plug>SimplefinderBufferOnCR',
+function! smartfinder#buffer#unmap_plugin_keys()
+  call smartfinder#safe_iunmap('<Plug>SimplefinderBufferOnCR',
         \                       '<Plug>SimplefinderBufferOnTab')
 endfunction
 
 
-function! simplefinder#buffer#map_default_keys()
-  call simplefinder#map_default_keys()
+function! smartfinder#buffer#map_default_keys()
+  call smartfinder#map_default_keys()
   imap <buffer> <CR>  <Plug>SimplefinderBufferOnCR
   imap <buffer> <Tab> <Plug>SimplefinderBufferOnTab
 endfunction
 
 
-function! simplefinder#buffer#unmap_default_keys()
-  call simplefinder#safe_iunmap('<CR>', '<Tab>')
-  call simplefinder#unmap_default_keys()
+function! smartfinder#buffer#unmap_default_keys()
+  call smartfinder#safe_iunmap('<CR>', '<Tab>')
+  call smartfinder#unmap_default_keys()
 endfunction
 
 
-function! simplefinder#buffer#omnifunc(findstart, base)
+function! smartfinder#buffer#omnifunc(findstart, base)
   if a:findstart
     return s:PROMPT_LEN
   else
@@ -150,17 +148,17 @@ function! simplefinder#buffer#omnifunc(findstart, base)
 endfunction
 
 
-function! simplefinder#buffer#action_open(item)
+function! smartfinder#buffer#action_open(item)
   return ':' . a:item.bufnr . 'buffer' . "\<CR>"
 endfunction
 
 
-function! simplefinder#buffer#action_delete(item)
+function! smartfinder#buffer#action_delete(item)
   call s:action_delete(a:item, '')
 endfunction
 
 
-function! simplefinder#buffer#action_delete_f(item)
+function! smartfinder#buffer#action_delete_f(item)
   call s:action_delete(a:item, '!')
 endfunction
 
@@ -170,22 +168,22 @@ function! s:action_delete(item, bang)
 endfunction
 
 
-function! simplefinder#buffer#on_cr(item)
+function! smartfinder#buffer#on_cr(item)
   if empty(a:item)
-    call simplefinder#error_msg('no input text')
+    call smartfinder#error_msg('no input text')
     return
   endif
 
   let function_name = s:ACTION_NAME_TABLE[s:DEFAULT_ACTION_NAME]
-  call simplefinder#end()
+  call smartfinder#end()
   call feedkeys("\<Esc>", 'n')
   call feedkeys(call(function_name, [a:item]), 'n')
 endfunction
 
 
-function! simplefinder#buffer#on_tab(item)
+function! smartfinder#buffer#on_tab(item)
   if empty(a:item)
-    call simplefinder#error_msg('no input text')
+    call smartfinder#error_msg('no input text')
     return
   endif
 
@@ -236,11 +234,11 @@ function! simplefinder#buffer#on_tab(item)
 
   if has_key(s:ACTION_KEY_TABLE, key)
     let function_name = s:ACTION_NAME_TABLE[s:ACTION_KEY_TABLE[key]]
-    call simplefinder#end()
+    call smartfinder#end()
     call feedkeys("\<Esc>", 'n')
     call call(function_name, [a:item])
   else
-    call simplefinder#error_msg('no action')
+    call smartfinder#error_msg('no action')
     return
   endif
 endfunction

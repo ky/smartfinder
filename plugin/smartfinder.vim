@@ -1,5 +1,5 @@
 "-----------------------------------------------------------------------------
-" simplefinder
+" smartfinder
 " Author: ky
 " Version: 0.1
 " License: The MIT License
@@ -27,24 +27,24 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-if (exists('loaded_simplefinder') && g:loaded_simplefinder) ||
+if (exists('loaded_smartfinder') && g:loaded_smartfinder) ||
       \ &compatible || v:version < 701
   finish
 endif
 
 
-let g:loaded_simplefinder = 1
+let g:loaded_smartfinder = 1
 
 
 let s:cpoptions = &cpoptions
 set cpoptions&vim
 
 
-command! -nargs=1 -complete=custom,simplefinder#command_complete SimpleFinder
-      \ call simplefinder#start(<q-args>)
+command! -nargs=1 -complete=custom,smartfinder#command_complete SmartFinder
+      \ call smartfinder#start(<q-args>)
 
 
 let &cpoptions = s:cpoptions
 unlet s:cpoptions
 
-" vim: set ts=8 sw=2 sts=2 fdm=marker:
+" vim: expandtab shiftwidth=2 softtabstop=2 foldmethod=marker

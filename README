@@ -1,17 +1,17 @@
-*simplefinder-readme*    README : simplefinder
+*smartfinder-readme*    README : smartfinder
 
 Author: ky <ky.vim13@gmail.com>
 Version: 0.1
 License: The MIT License
 
 ==============================================================================
-INTRODUCTION                                *simplefinder-readme-introduction*
+INTRODUCTION                                *smartfinder-readme-introduction*
 
  see doc/*.jax
  
 
 ==============================================================================
-BUGS                                                *simplefinder-readme-bugs*
+BUGS                                                *smartfinder-readme-bugs*
 
   英語ドキュメントは書けません。
 
