@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder
 " Author: ky
-" Version: 0.1
+" Version: 0.1.1
 " License: The MIT License
 " The MIT License {{{
 "
@@ -27,16 +27,8 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-if has('win16') || has('win32') || has('win64')
-  let s:BUFNAME = '[smartfinder]'
-else
-  let s:BUFNAME = '*smartfinder*'
-endif
-
 let s:prompt = ''
 let s:prompt_len = -1
-
-
 let s:completeopt = ''
 let s:ignorecase = ''
 let s:bufnr = -1
@@ -44,6 +36,7 @@ let s:winnr = -1
 let s:last_col = -1
 let s:activate_flag = 0
 let s:mode_name = ''
+let s:loaded_mode_options = {}
 
 
 function! s:do(function_name, ...)
@@ -57,7 +50,16 @@ function! smartfinder#start(mode_name)
   call s:init()
   call s:do('init')
 
-  let s:prompt = s:do('get_prompt')
+  if !has_key(s:loaded_mode_options, s:mode_name)
+    if !has_key(g:SmartFinderOptions.Mode, s:mode_name)
+      let g:SmartFinderOptions.Mode[s:mode_name] = {}
+    endif
+    call extend(g:SmartFinderOptions.Mode[s:mode_name],
+          \     s:do('options'), 'keep')
+    let s:loaded_mode_options[s:mode_name] = 1
+  endif
+
+  let s:prompt = g:SmartFinderOptions.Mode[s:mode_name]['prompt']
   let s:prompt_len = strlen(s:prompt)
 
   if bufexists(s:bufnr)
@@ -84,12 +86,11 @@ endfunction
 
 
 function! s:init()
-  let s:activate_flag = 1
-
   if exists(':AutoComplPopLock') == 2
-    silent AutoComplPopLock
+    AutoComplPopLock
   endif
 
+  let s:activate_flag = 1
   let s:last_col = -1
   let s:completeopt = &completeopt
   let s:ignorecase = &ignorecase
@@ -101,13 +102,13 @@ endfunction
 
 
 function! s:term()
+  if exists(':AutoComplPopUnlock') == 2
+    AutoComplPopUnlock
+  endif
+
   let s:activate_flag = 0
   let &completeopt = s:completeopt
   let &ignorecase = s:ignorecase
-
-  if exists(':AutoComplPopUnlock') == 2
-    silent AutoComplPopUnlock
-  endif
 
   call s:do('unmap_default_keys')
   call smartfinder#unmap_plugin_keys()
@@ -129,9 +130,9 @@ function! s:init_buf()
   setlocal filetype=smartfinder
 
   " :help `=
-  silent file `=s:BUFNAME`
+  silent file `=g:SmartFinderOptions.Global.bufname`
 
-  augroup SimplefinderAugroup
+  augroup SmartFinderAugroup
     autocmd!
     autocmd InsertLeave <buffer> call smartfinder#end()
     autocmd WinLeave <buffer> call smartfinder#end()
@@ -151,7 +152,7 @@ endfunction
 
 function! s:exists_prompt(line)
   return strlen(a:line) >= s:prompt_len &&
-        \ a:line[: s:prompt_len -1] ==# s:prompt
+        \ a:line[: s:prompt_len - 1] ==# s:prompt
 endfunction
 
 
@@ -175,6 +176,8 @@ function! s:on_cursor_moved_i()
   let line = getline('.')
   let col = col('.')
 
+  "echo 'line : ' . strlen(line) . ', col : ' . col
+  "sleep 1
   if !s:exists_prompt(line)
     call s:restore_prompt(line)
     return
@@ -201,9 +204,9 @@ endfunction
 
 
 function! smartfinder#map_plugin_keys()
-  inoremap <buffer> <Plug>SimplefinderOnBS
+  inoremap <buffer> <Plug>SmartFinderOnBS
         \ <C-r>=smartfinder#on_bs() ? '' : ''<CR>
-  inoremap <buffer> <Plug>SimplefinderCancel <Esc>
+  inoremap <buffer> <Plug>SmartFinderCancel <Esc>
 
   call s:do('map_plugin_keys')
 endfunction
@@ -211,15 +214,16 @@ endfunction
 
 function! smartfinder#unmap_plugin_keys()
   call s:do('unmap_plugin_keys')
-  call smartfinder#safe_iunmap('<Plug>SimplefinderOnBS',
-        \                       '<Plug>SimplefinderCancel')
+  call smartfinder#safe_iunmap('<Plug>SmartFinderOnBS',
+        \                       '<Plug>SmartFinderCancel')
 endfunction
 
 
 function! smartfinder#map_default_keys()
-  imap <buffer> <BS> <Plug>SimplefinderOnBS
-  imap <buffer> <Esc> <Plug>SimplefinderCancel
-  imap <buffer> <C-c> <Plug>SimplefinderCancel
+  imap <buffer> <Esc> <Plug>SmartFinderCancel
+  imap <buffer> <C-c> <Plug>SmartFinderCancel
+  imap <buffer> <BS> <Plug>SmartFinderOnBS
+  imap <buffer> <C-h> <Plug>SmartFinderOnBS
   inoremap <buffer> <C-l> <Nop>
 endfunction
 
@@ -233,7 +237,7 @@ endfunction
 
 
 function! smartfinder#unmap_default_keys()
-  call smartfinder#safe_iunmap('<BS>', '<Esc>', '<C-c>', '<C-l>')
+  call smartfinder#safe_iunmap('<Esc>', '<C-c>', '<BS>', '<C-h>', '<C-l>')
 endfunction
 
 
@@ -317,6 +321,19 @@ function! smartfinder#command_complete(arglead, cmdline, cursorpos)
         \  "\n"
         \)
 endfunction
+
+
+" global options
+if exists('g:SmartFinderOptions')
+  call extend(g:SmartFinderOptions, { 'Global' : {}, 'Mode' : {} }, 'keep')
+else
+  let g:SmartFinderOptions = { 'Global' : {}, 'Mode' : {} }
+endif
+
+let s:DefaultOptions = { 'Global' : {} }
+let s:DefaultOptions.Global.bufname = '[smartfinder]'
+call map(s:DefaultOptions,
+      \ 'extend(g:SmartFinderOptions[v:key], v:val, "keep")')
 
 
 " vim: expandtab shiftwidth=2 softtabstop=2 foldmethod=marker

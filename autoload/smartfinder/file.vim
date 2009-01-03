@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder - file
 " Author: ky
-" Version: 0.1
+" Version: 0.1.1
 " License: The MIT License
 " The MIT License {{{
 "
@@ -27,41 +27,49 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-if has('win16') || has('win32') || has('win64')
-  let s:SEPARATOR_PATTERN = '[\\/]'
-  let s:SEPARATOR = '\'
-else
-  let s:SEPARATOR_PATTERN = '/'
-  let s:SEPARATOR = '/'
-endif
+let s:ESCAPE_KEY = '\'
+let s:MODE_NAME = expand('<sfile>:t:r')
 
-let s:PROMPT = 'file>'
-let s:DIR_PATTERN = '^.*' . s:SEPARATOR_PATTERN
-let s:NO_FILENAME_PATTERN = '^.*' . s:SEPARATOR_PATTERN . '$'
-let s:SHOW_DOT_FILE_PATTERN = '^.*' . s:SEPARATOR_PATTERN . '*\.$'
-let s:DEFAULT_ACTION_NAME = 'open'
-let s:ACTION_KEY_TABLE = {
-      \ 'o' : 'open',
-      \ 'O' : 'open!',
-      \}
-let s:ACTION_NAME_TABLE = {
-      \ 'open'  : 'smartfinder#file#action_open',
-      \ 'open!' : 'smartfinder#file#action_open_f',
-      \}
-
+let s:SEPARATOR = '/'
+let s:DIR_PATTERN = '\V\^\.\*' . s:SEPARATOR
+let s:NO_FILENAME_PATTERN = '\V\^\.\*' . s:SEPARATOR . '\$'
+let s:DRIVE_LETTER_PATTERN = '\V\^\.\{-}' . s:SEPARATOR
 
 let s:cache_filelist = []
 let s:last_input_string = ''
 
 
-function! smartfinder#file#init()
-  let s:cache_filelist = []
-  let s:last_input_string = ''
+function! smartfinder#file#options()
+  let ABSOLUTE_PATH_PATTERN = [ '\V\^\[$~' . s:SEPARATOR . ']' ]
+  let ACTION_KEY_TABLE = {
+        \ 'o' : 'open',
+        \ 'O' : 'open!',
+        \}
+  let ACTION_NAME_TABLE = {
+        \ 'open'  : 'smartfinder#file#action_open',
+        \ 'open!' : 'smartfinder#file#action_open_f',
+        \}
+  let DEFAULT_ACTION = 'open'
+  let PROMPT = 'file>'
+
+  return {
+        \ 'absolute_path_pattern' : ABSOLUTE_PATH_PATTERN,
+        \ 'action_key_table'      : ACTION_KEY_TABLE,
+        \ 'action_name_table'     : ACTION_NAME_TABLE,
+        \ 'default_action'        : DEFAULT_ACTION,
+        \ 'prompt'                : PROMPT,
+        \}
 endfunction
 
 
-function! smartfinder#file#get_prompt()
-  return s:PROMPT
+function! s:get_option()
+  return g:SmartFinderOptions.Mode[s:MODE_NAME]
+endfunction
+
+
+function! smartfinder#file#init()
+  let s:cache_filelist = []
+  let s:last_input_string = ''
 endfunction
 
 
@@ -72,64 +80,112 @@ endfunction
 
 function! s:make_relative_dir_pattern(dir)
   let wi = ''
+  let escape = 0
+  let star = 0
+
   for c in split(a:dir, '\zs')
-    if c != '*' && c != '?' && c != '.'
-      let wi .= '*'
+    if escape
+      let wi .= c
+      let escape = 0
+      continue
     endif
-    let wi .= (c != '\' ? c : '/')
+
+    if c == s:ESCAPE_KEY
+      if star
+        let star = 0
+      else
+        let wi .= '*'
+      endif
+      let wi .= s:ESCAPE_KEY
+      let escape = 1
+    else
+      if c != '*' && c != '?' && c != '.'
+        if star
+          let star = 0
+        else
+          let wi .= '*'
+        endif
+        let wi .= (c != s:SEPARATOR
+              \    ? '[' . (c != '`' ? c : '\' . c) . ']'
+              \    : s:SEPARATOR)
+      else
+        let wi .= c
+        if c == '*'
+          let star = 1
+        else
+          let star = 0
+        endif
+      endif
+    endif
   endfor
+
   return wi
 endfunction
 
 
 function! s:make_absolute_dir_pattern(dir)
-  let head = matchstr(a:dir, '^.\{-}' . s:SEPARATOR_PATTERN)
-  return head . s:make_relative_dir_pattern(a:dir[strlen(head) :])
+  let drive = matchstr(a:dir, s:DRIVE_LETTER_PATTERN)
+  return drive . s:make_relative_dir_pattern(a:dir[strlen(drive) :])
 endfunction
 
 
 function! s:make_regex_pattern(str)
-  let re = ''
   if empty(a:str)
-    let re = '*'
-  else
-    for c in split(a:str, '\zs')
-      if c != '*' && c != '?'
-        let re .= '*'
-      endif
-      let re .= (c != '\' ? c : '/')
-    endfor
+    return '\V\.\*'
   endif
-  for [pat, sub] in [
-        \ [ '*', '\\.\\*' ],
-        \ [ '?', '\\.' ]
-        \]
-    let re = substitute(re, pat, sub, 'g')
+
+  let re = ''
+
+  let escape = 0
+  for c in split(a:str, '\zs')
+    if escape
+      let re .= (c != '\' ? c : '\\')
+      let escape = 0
+      continue
+    endif
+
+    if c == s:ESCAPE_KEY
+      let escape = 1
+    else
+      if c == '?'
+        let re .= '\.'
+      else
+        let re .= '\.\*'
+        if c != '*'
+          let re .= c
+        endif
+      endif
+    endif
   endfor
+
+  if escape
+    let re .= '\\'
+  endif
+
   return '\V' . re
 endfunction
 
 
 function! smartfinder#file#map_plugin_keys()
-  inoremap <buffer> <Plug>SimplefinderFileOnCR
+  inoremap <buffer> <Plug>SmartFinderFileOnCR
         \ <C-r>=smartfinder#action_handler('smartfinder#file#on_cr')
         \ ? '' : ''<CR>
-  inoremap <buffer> <Plug>SimplefinderFileOnTab
+  inoremap <buffer> <Plug>SmartFinderFileOnTab
         \ <C-r>=smartfinder#action_handler('smartfinder#file#on_tab')
         \ ? '' : ''<CR>
 endfunction
 
 
 function! smartfinder#file#unmap_plugin_keys()
-  call smartfinder#safe_iunmap('<Plug>SimplefinderFileOnCR',
-        \                      '<Plug>SimplefinderFileOnTab')
+  call smartfinder#safe_iunmap('<Plug>SmartFinderFileOnCR',
+        \                      '<Plug>SmartFinderFileOnTab')
 endfunction
 
 
 function! smartfinder#file#map_default_keys()
   call smartfinder#map_default_keys()
-  imap <buffer> <CR>  <Plug>SimplefinderFileOnCR
-  imap <buffer> <Tab> <Plug>SimplefinderFileOnTab
+  imap <buffer> <CR>  <Plug>SmartFinderFileOnCR
+  imap <buffer> <Tab> <Plug>SmartFinderFileOnTab
 endfunction
 
 
@@ -156,51 +212,103 @@ endfunction
 
 
 function! smartfinder#file#omnifunc(findstart, base)
+  let prompt_len = strlen(s:get_option()['prompt'])
+
   if a:findstart
-    return strlen(s:PROMPT)
+    return 0
   else
-    let dir = matchstr(a:base, s:DIR_PATTERN)
-    let fname = a:base[strlen(dir) :]
-    let show_dot_files = (a:base =~ s:SHOW_DOT_FILE_PATTERN
-          \               ? 1
-          \               : (fname =~ '^\.'))
-    let diff_str = s:last_input_string[strlen(a:base) :]
+    let base = a:base[prompt_len :]
+    let dir = matchstr(base, s:DIR_PATTERN)
+    let fname = base[strlen(dir) :]
+    let show_dot_files = fname =~ '\V\^.\$'
+    let diff_str = s:last_input_string[strlen(base) :]
 
     if show_dot_files ||
-          \ strlen(a:base) < 1 ||
-          \ a:base =~ s:NO_FILENAME_PATTERN ||
+          \ strlen(base) < 1 ||
+          \ base =~ s:NO_FILENAME_PATTERN ||
           \ diff_str =~ s:NO_FILENAME_PATTERN
       let s:cache_filelist = []
       
-      let items = s:create_filename_list(s:make_absolute_dir_pattern(dir),
-            \                            show_dot_files)
-      if empty(items)
-        let items = s:create_filename_list(s:make_relative_dir_pattern(dir),
-              \                            show_dot_files)
-      endif
-
-      for i in items
-        call add(s:cache_filelist, { 'word' : i, 'dup' : 0 })
+      let abs = 0
+      for absolute_path_pattern in s:get_option()['absolute_path_pattern']
+        if base =~ absolute_path_pattern
+          let abs = 1
+          break
+        endif
       endfor
-      call map(s:cache_filelist,
-            \ 'extend(v:val,' .
-            \        'isdirectory(v:val.word) ' .
-            \        '? { "abbr" : v:val.word . s:SEPARATOR } ' .
-            \        ': {})')
+      if abs
+        let pattern = s:make_absolute_dir_pattern(dir)
+      else
+        let pattern = s:make_relative_dir_pattern(dir)
+      endif
+      let items = s:create_filename_list(pattern, show_dot_files)
+
+      if has('win16') || has('win32') || has('win64')
+        for i in items
+          call add(s:cache_filelist,
+                \  {
+                \    'word' : substitute(i, '\', s:SEPARATOR, 'g'),
+                \    'dup' : 0
+                \  }
+                \)
+        endfor
+      else
+        for i in items
+          call add(s:cache_filelist, { 'word' : i, 'dup' : 0 })
+        endfor
+      endif
     endif
 
-    let s:last_input_string = a:base
+    let s:last_input_string = base
 
     let fname_pattern = s:make_regex_pattern(fname)
     let filter_cond =
           \ 's:extract_filename(v:val.word) =~? ' . string(fname_pattern)
-    return filter(copy(s:cache_filelist), filter_cond)
+    let result = filter(copy(s:cache_filelist), filter_cond)
+    let num = 0
+    let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s%s'
+    for item in result
+      let num += 1
+      let item.abbr = printf(format, num, item.word,
+            \ isdirectory(item.word) ? s:SEPARATOR : '')
+    endfor
+    return result
   endif
 endfunction
 
 
+function! s:fnameescape(fname)
+  let fname = ''
+
+  if has('win16') || has('win32') || has('win64')
+    if exists('*fnameescape')
+      let fname = fnameescape(a:fname)
+    else
+      let fname = escape(a:fname, " \t\n*?`%#'\"|!<")
+    endif
+
+    let fname = substitute(fname, '\\!', '!', 'g')
+    if fname =~ '\V\^\[+~]'
+      let fname = '.\' . fname
+    endif
+  else
+    if exists('*fnameescape')
+      let fname = fnameescape(a:fname)
+    else
+      let fname = escape(a:fname, " \t\n*?[{`$\\%#'\"|!<>")
+    endif
+
+    if fname =~ '\V\^\[+~]'
+      let fname = '\' . fname
+    endif
+  endif
+
+  return fname
+endfunction
+
+
 function! s:action_open(item, bang)
-  return ':edit' . a:bang . ' ' . fnameescape(a:item.word) . "\<CR>"
+  return ':edit' . a:bang . ' ' . s:fnameescape(a:item.word) . "\<CR>"
 endfunction
 
 
@@ -220,7 +328,8 @@ function! smartfinder#file#on_cr(item)
     return
   endif
 
-  let function_name = s:ACTION_NAME_TABLE[s:DEFAULT_ACTION_NAME]
+  let option = s:get_option()
+  let function_name = option['action_name_table'][option['default_action']]
   call smartfinder#end()
   call feedkeys("\<Esc>", 'n')
   call feedkeys(call(function_name, [a:item]), 'n')
@@ -234,11 +343,13 @@ function! smartfinder#file#on_tab(item)
     return
   endif
 
-  let keys = sort(copy(keys(s:ACTION_KEY_TABLE)))
+  let option = s:get_option()
+  let action_key_table = option['action_key_table']
+  let keys = sort(copy(keys(action_key_table)))
   let action_count = len(keys)
   let key_names = map(copy(keys), 'strtrans(v:val)')
   let max_key_width = max(map(copy(key_names), 'strlen(v:val)'))
-  let action_names = map(copy(keys), 's:ACTION_KEY_TABLE[v:val]')
+  let action_names = map(copy(keys), 'action_key_table[v:val]')
   let max_action_width = max(map(copy(action_names), 'strlen(v:val)'))
   let spacer = repeat(' ', 2)
   let spacer_len = strlen(spacer)
@@ -275,16 +386,19 @@ function! smartfinder#file#on_tab(item)
   let key = nr2char(getchar())
   redraw
 
-  if key != "\<Esc>" && key != "\<C-c>"
-    if has_key(s:ACTION_KEY_TABLE, key)
-      let function_name = s:ACTION_NAME_TABLE[s:ACTION_KEY_TABLE[key]]
-      call smartfinder#end()
-      call feedkeys("\<Esc>", 'n')
-      call call(function_name, [a:item])
-    else
-      call smartfinder#error_msg('no action')
-      return
-    endif
+  if key == "\<Esc>" || key == "\<C-c>"
+    return
+  endif
+
+  if has_key(action_key_table, key)
+    let action_name_table = option['action_name_table']
+    let function_name = action_name_table[action_key_table[key]]
+    call smartfinder#end()
+    call feedkeys("\<Esc>", 'n')
+    call feedkeys(call(function_name, [a:item]), 'n')
+  else
+    call smartfinder#error_msg('no action')
+    return
   endif
 endfunction
 

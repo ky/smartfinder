@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder - buffer
 " Author: ky
-" Version: 0.1
+" Version: 0.1.1
 " License: The MIT License
 " The MIT License {{{
 "
@@ -33,23 +33,38 @@ else
   let s:REGEX_SEPARATOR_PATTERN = []
 endif
 
-let s:PROMPT = 'buffer>'
-let s:PROMPT_LEN = strlen(s:PROMPT)
-let s:CANCEL_CHOOSE_ACTION_KEY = "[\<Esc>\<C-c>]"
-let s:DEFAULT_ACTION_NAME = 'open'
-let s:ACTION_KEY_TABLE = {
-      \ 'o' : 'open',
-      \ 'd' : 'delete',
-      \ 'D' : 'delete!',
-      \}
-let s:ACTION_NAME_TABLE = {
-      \ 'open'    : 'smartfinder#buffer#action_open',
-      \ 'delete'  : 'smartfinder#buffer#action_delete',
-      \ 'delete!' : 'smartfinder#buffer#action_delete_f',
-      \}
+let s:MODE_NAME = expand('<sfile>:t:r')
 
 
 let s:cache_buflist = []
+
+
+function! smartfinder#buffer#options()
+  let ACTION_KEY_TABLE = {
+        \ 'o' : 'open',
+        \ 'd' : 'delete',
+        \ 'D' : 'delete!',
+        \}
+  let ACTION_NAME_TABLE = {
+        \ 'open'    : 'smartfinder#buffer#action_open',
+        \ 'delete'  : 'smartfinder#buffer#action_delete',
+        \ 'delete!' : 'smartfinder#buffer#action_delete_f',
+        \}
+  let DEFAULT_ACTION = 'open'
+  let PROMPT = 'buffer>'
+
+  return {
+        \ 'action_key_table'  : ACTION_KEY_TABLE,
+        \ 'action_name_table' : ACTION_NAME_TABLE,
+        \ 'default_action'    : DEFAULT_ACTION,
+        \ 'prompt'            : PROMPT,
+        \}
+endfunction
+
+
+function! s:get_option()
+  return g:SmartFinderOptions.Mode[s:MODE_NAME]
+endfunction
 
 
 function! smartfinder#buffer#init()
@@ -71,11 +86,6 @@ function! smartfinder#buffer#init()
 	    \})
     endif
   endfor
-endfunction
-
-
-function! smartfinder#buffer#get_prompt()
-  return s:PROMPT
 endfunction
 
 
@@ -110,25 +120,25 @@ endfunction
 
 
 function! smartfinder#buffer#map_plugin_keys()
-  inoremap <buffer> <silent> <Plug>SimplefinderBufferOnCR
+  inoremap <buffer> <silent> <Plug>SmartFinderBufferOnCR
         \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_cr')
         \ ? '' : ''<CR>
-  inoremap <buffer> <silent> <Plug>SimplefinderBufferOnTab
+  inoremap <buffer> <silent> <Plug>SmartFinderBufferOnTab
         \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_tab')
         \ ? '' : ''<CR>
 endfunction
 
 
 function! smartfinder#buffer#unmap_plugin_keys()
-  call smartfinder#safe_iunmap('<Plug>SimplefinderBufferOnCR',
-        \                       '<Plug>SimplefinderBufferOnTab')
+  call smartfinder#safe_iunmap('<Plug>SmartFinderBufferOnCR',
+        \                       '<Plug>SmartFinderBufferOnTab')
 endfunction
 
 
 function! smartfinder#buffer#map_default_keys()
   call smartfinder#map_default_keys()
-  imap <buffer> <CR>  <Plug>SimplefinderBufferOnCR
-  imap <buffer> <Tab> <Plug>SimplefinderBufferOnTab
+  imap <buffer> <CR>  <Plug>SmartFinderBufferOnCR
+  imap <buffer> <Tab> <Plug>SmartFinderBufferOnTab
 endfunction
 
 
@@ -140,10 +150,18 @@ endfunction
 
 function! smartfinder#buffer#omnifunc(findstart, base)
   if a:findstart
-    return s:PROMPT_LEN
+    return 0
   else
-    let pattern = s:make_pattern(a:base)
-    return filter(copy(s:cache_buflist), 'v:val.word =~ ' . string(pattern))
+    let prompt_len = strlen(s:get_option()['prompt'])
+    let pattern = s:make_pattern(a:base[prompt_len :])
+    let result = filter(copy(s:cache_buflist), 'v:val.word =~ ' . string(pattern))
+    let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s'
+    let num = 0
+    for item in result
+      let num += 1
+      let item.abbr = printf(format, num, item.word)
+    endfor
+    return result
   endif
 endfunction
 
@@ -154,12 +172,12 @@ endfunction
 
 
 function! smartfinder#buffer#action_delete(item)
-  call s:action_delete(a:item, '')
+  return s:action_delete(a:item, '')
 endfunction
 
 
 function! smartfinder#buffer#action_delete_f(item)
-  call s:action_delete(a:item, '!')
+  return s:action_delete(a:item, '!')
 endfunction
 
 
@@ -174,7 +192,8 @@ function! smartfinder#buffer#on_cr(item)
     return
   endif
 
-  let function_name = s:ACTION_NAME_TABLE[s:DEFAULT_ACTION_NAME]
+  let option = s:get_option()
+  let function_name = option['action_name_table'][option['default_action']]
   call smartfinder#end()
   call feedkeys("\<Esc>", 'n')
   call feedkeys(call(function_name, [a:item]), 'n')
@@ -187,11 +206,13 @@ function! smartfinder#buffer#on_tab(item)
     return
   endif
 
-  let keys = sort(copy(keys(s:ACTION_KEY_TABLE)))
+  let option = s:get_option()
+  let action_key_table = option['action_key_table']
+  let keys = sort(copy(keys(action_key_table)))
   let action_count = len(keys)
   let key_names = map(copy(keys), 'strtrans(v:val)')
   let max_key_width = max(map(copy(key_names), 'strlen(v:val)'))
-  let action_names = map(copy(keys), 's:ACTION_KEY_TABLE[v:val]')
+  let action_names = map(copy(keys), 'action_key_table[v:val]')
   let max_action_width = max(map(copy(action_names), 'strlen(v:val)'))
   let spacer = repeat(' ', 2)
   let spacer_len = strlen(spacer)
@@ -228,15 +249,16 @@ function! smartfinder#buffer#on_tab(item)
   let key = nr2char(getchar())
   redraw
 
-  if key =~ s:CANCEL_CHOOSE_ACTION_KEY
+  if key == "\<Esc>" || key == "\<C-c>"
     return
   endif
 
-  if has_key(s:ACTION_KEY_TABLE, key)
-    let function_name = s:ACTION_NAME_TABLE[s:ACTION_KEY_TABLE[key]]
+  if has_key(action_key_table, key)
+    let action_name_table = option['action_name_table']
+    let function_name = action_name_table[action_key_table[key]]
     call smartfinder#end()
     call feedkeys("\<Esc>", 'n')
-    call call(function_name, [a:item])
+    call feedkeys(call(function_name, [a:item]), 'n')
   else
     call smartfinder#error_msg('no action')
     return
