@@ -86,10 +86,6 @@ endfunction
 
 
 function! s:init()
-  if exists(':AutoComplPopLock') == 2
-    AutoComplPopLock
-  endif
-
   let s:activate_flag = 1
   let s:last_col = -1
   let s:completeopt = &completeopt
@@ -102,10 +98,6 @@ endfunction
 
 
 function! s:term()
-  if exists(':AutoComplPopUnlock') == 2
-    AutoComplPopUnlock
-  endif
-
   let s:activate_flag = 0
   let &completeopt = s:completeopt
   let &ignorecase = s:ignorecase
@@ -134,7 +126,7 @@ function! s:init_buf()
 
   augroup SmartFinderAugroup
     autocmd!
-    autocmd InsertLeave <buffer> call smartfinder#end()
+    autocmd InsertLeave <buffer> nested call smartfinder#end()
     autocmd WinLeave <buffer> call smartfinder#end()
     autocmd BufLeave <buffer> call smartfinder#end()
     autocmd CursorMovedI <buffer> call s:on_cursor_moved_i()
@@ -176,8 +168,6 @@ function! s:on_cursor_moved_i()
   let line = getline('.')
   let col = col('.')
 
-  "echo 'line : ' . strlen(line) . ', col : ' . col
-  "sleep 1
   if !s:exists_prompt(line)
     call s:restore_prompt(line)
     return
