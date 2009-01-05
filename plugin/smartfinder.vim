@@ -28,7 +28,7 @@
 "-----------------------------------------------------------------------------
 
 if (exists('loaded_smartfinder') && g:loaded_smartfinder) ||
-      \ &compatible || v:version < 701
+      \ &compatible || v:version < 700
   finish
 endif
 
