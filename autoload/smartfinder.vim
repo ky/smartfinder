@@ -322,8 +322,11 @@ endif
 
 let s:DefaultOptions = { 'Global' : {} }
 let s:DefaultOptions.Global.bufname = '[smartfinder]'
+
 call map(s:DefaultOptions,
       \ 'extend(g:SmartFinderOptions[v:key], v:val, "keep")')
+
+
 
 
 " vim: expandtab shiftwidth=2 softtabstop=2 foldmethod=marker
