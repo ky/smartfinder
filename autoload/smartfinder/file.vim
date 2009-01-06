@@ -41,14 +41,20 @@ let s:last_input_string = ''
 
 function! smartfinder#file#options()
   let ABSOLUTE_PATH_PATTERN = [ '\V\^\[$~' . s:SEPARATOR . ']' ]
+  if has('win16') || has('win32') || has('win64')
+    call add(ABSOLUTE_PATH_PATTERN, '\V\^\[a-zA-Z]' . s:SEPARATOR)
+  endif
+
   let ACTION_KEY_TABLE = {
         \ 'o' : 'open',
         \ 'O' : 'open!',
         \}
+
   let ACTION_NAME_TABLE = {
         \ 'open'  : 'smartfinder#file#action_open',
         \ 'open!' : 'smartfinder#file#action_open_f',
         \}
+
   let DEFAULT_ACTION = 'open'
   let PROMPT = 'file>'
 
@@ -105,9 +111,9 @@ function! s:make_relative_dir_pattern(dir)
         else
           let wi .= '*'
         endif
-        let wi .= (c != s:SEPARATOR
-              \    ? '[' . (c != '`' ? c : '\' . c) . ']'
-              \    : s:SEPARATOR)
+        let wi .= (c =~ '\V\[a-zA-Z_/()-]'
+              \    ? c
+              \    : '[' . (c != '`' ? c : '\' . c) . ']')
       else
         let wi .= c
         if c == '*'

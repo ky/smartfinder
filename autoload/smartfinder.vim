@@ -205,7 +205,7 @@ endfunction
 function! smartfinder#unmap_plugin_keys()
   call s:do('unmap_plugin_keys')
   call smartfinder#safe_iunmap('<Plug>SmartFinderOnBS',
-        \                       '<Plug>SmartFinderCancel')
+        \                      '<Plug>SmartFinderCancel')
 endfunction
 
 
@@ -311,20 +311,6 @@ function! smartfinder#command_complete(arglead, cmdline, cursorpos)
         \  "\n"
         \)
 endfunction
-
-
-" global options
-if exists('g:SmartFinderOptions')
-  call extend(g:SmartFinderOptions, { 'Global' : {}, 'Mode' : {} }, 'keep')
-else
-  let g:SmartFinderOptions = { 'Global' : {}, 'Mode' : {} }
-endif
-
-let s:DefaultOptions = { 'Global' : {} }
-let s:DefaultOptions.Global.bufname = '[smartfinder]'
-
-call map(s:DefaultOptions,
-      \ 'extend(g:SmartFinderOptions[v:key], v:val, "keep")')
 
 
 
