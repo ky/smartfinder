@@ -42,7 +42,7 @@ let s:last_input_string = ''
 function! smartfinder#file#options()
   let ABSOLUTE_PATH_PATTERN = [ '\V\^\[$~' . s:SEPARATOR . ']' ]
   if has('win16') || has('win32') || has('win64')
-    call add(ABSOLUTE_PATH_PATTERN, '\V\^\[a-zA-Z]' . s:SEPARATOR)
+    call add(ABSOLUTE_PATH_PATTERN, '\V\^\[a-zA-Z]:' . s:SEPARATOR)
   endif
 
   let ACTION_KEY_TABLE = {
