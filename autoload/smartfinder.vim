@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder
 " Author: ky
-" Version: 0.1.1
+" Version: 0.2
 " License: The MIT License
 " The MIT License {{{
 "
@@ -27,93 +27,85 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-let s:prompt = ''
-let s:prompt_len = -1
-let s:completeopt = ''
-let s:ignorecase = ''
-let s:bufnr = -1
-let s:winnr = -1
-let s:last_col = -1
-let s:activate_flag = 0
-let s:mode_name = ''
-let s:loaded_mode_options = {}
-
-
-function! s:do(function_name, ...)
-  return call(printf('smartfinder#%s#%s', s:mode_name, a:function_name), a:000)
-endfunction
-
-
 function! smartfinder#start(mode_name)
-  let s:mode_name = a:mode_name
+  let s:options.mode_name = a:mode_name
 
-  call s:init()
-  call s:do('init')
+  call s:initialize()
+  call s:invoke('initialize')
 
-  if !has_key(s:loaded_mode_options, s:mode_name)
-    if !has_key(g:SmartFinderOptions.Mode, s:mode_name)
-      let g:SmartFinderOptions.Mode[s:mode_name] = {}
-    endif
-    call extend(g:SmartFinderOptions.Mode[s:mode_name],
-          \     s:do('options'), 'keep')
-    let s:loaded_mode_options[s:mode_name] = 1
-  endif
+  call s:initialize_mode_options()
+  call s:initialize_prompt()
 
-  let s:prompt = g:SmartFinderOptions.Mode[s:mode_name]['prompt']
-  let s:prompt_len = strlen(s:prompt)
-
-  if bufexists(s:bufnr)
+  if bufexists(s:options.bufnr)
     leftabove 1split
-    silent execute s:bufnr . 'buffer'
+    let s:options.new_window = 1
+    silent execute s:options.bufnr . 'buffer'
   else
     leftabove 1new
-    call s:init_buf()
+    let s:options.new_window = 1
+    call s:initialize_buffer()
   endif
 
-  call smartfinder#map_plugin_keys()
-  call s:do('map_default_keys')
+  call s:map_keys()
 
-  silent % delete _
+  silent %delete _
+  call setline('.', s:options.prompt)
   call feedkeys('A', 'n')
 endfunction
 
 
 function! smartfinder#end()
-  if s:activate_flag
-    call s:term()
+  if s:options.activate_flag
+    call s:terminate()
   endif
 endfunction
 
 
-function! s:init()
-  let s:activate_flag = 1
-  let s:last_col = -1
-  let s:completeopt = &completeopt
-  let s:ignorecase = &ignorecase
-  let s:winnr = winnr()
-
-  set completeopt=menuone
-  set ignorecase
+function! s:invoke(function_name, ...)
+  return call(
+        \ printf('smartfinder#%s#%s', s:options.mode_name, a:function_name),
+        \ a:000
+        \)
 endfunction
 
 
-function! s:term()
-  let s:activate_flag = 0
-  let &completeopt = s:completeopt
-  let &ignorecase = s:ignorecase
+function! s:initialize()
+  let s:options.activate_flag = 1
+  let s:options.last_col = -1
+  let s:options.add_input_history = 1
+  let s:options.show_input_history_pos = -1
+  let s:options.winnr = winnr()
+  let s:options.new_window = 0
+  let s:options.completeopt = &completeopt
+  let s:options.ignorecase = &ignorecase
+  let s:options.smartcase = &smartcase
 
-  call s:do('unmap_default_keys')
-  call smartfinder#unmap_plugin_keys()
+  set completeopt=menuone
+  set ignorecase
+  set nosmartcase
+endfunction
 
-  close
-  execute s:winnr . 'wincmd w'
+
+function! s:terminate()
+  call s:normalize_history()
+  call s:unmap_keys()
+  call s:invoke('terminate')
+
+  let s:options.activate_flag = 0
+  let &completeopt = s:options.completeopt
+  let &ignorecase = s:options.ignorecase
+  let &smartcase = s:options.smartcase
+
+  if s:options.new_window
+    let s:options.new_window = 0
+    close
+  endif
+  execute s:options.winnr . 'wincmd w'
   redraw
 endfunction
 
 
-function! s:init_buf()
-  let s:bufnr = bufnr('%')
-
+function! s:initialize_buffer()
   setlocal bufhidden=hide
   setlocal nobuflisted
   setlocal buftype=nofile
@@ -122,7 +114,8 @@ function! s:init_buf()
   setlocal filetype=smartfinder
 
   " :help `=
-  silent file `=g:SmartFinderOptions.Global.bufname`
+  file `=s:global_option('bufname')`
+  let s:options.bufnr = bufnr('%')
 
   augroup SmartFinderAugroup
     autocmd!
@@ -130,11 +123,34 @@ function! s:init_buf()
     autocmd WinLeave <buffer> call smartfinder#end()
     autocmd BufLeave <buffer> call smartfinder#end()
     autocmd CursorMovedI <buffer> call s:on_cursor_moved_i()
+
+    autocmd CursorHold * call s:save_history()
+    autocmd CursorHoldI * call s:save_history()
+    autocmd VimLeave * call s:save_history()
   augroup END
 endfunction
 
 
-function! smartfinder#error_msg(msg)
+function! s:initialize_mode_options()
+  if !has_key(s:options.loaded_mode_options, s:options.mode_name)
+    if !has_key(g:smartfinder_options.mode, s:options.mode_name)
+      let g:smartfinder_options.mode[s:options.mode_name] = {}
+    endif
+    call extend(g:smartfinder_options.mode[s:options.mode_name],
+          \     s:invoke('options'), 'keep')
+    let s:options.loaded_mode_options[s:options.mode_name] = 1
+  endif
+endfunction
+
+
+function! s:initialize_prompt()
+  let s:options.prompt =
+        \ g:smartfinder_options.mode[s:options.mode_name]['prompt']
+  let s:options.prompt_len = strlen(s:options.prompt)
+endfunction
+
+
+function! smartfinder#error_message(msg)
   echohl ErrorMsg
   echomsg a:msg
   echohl None
@@ -142,25 +158,32 @@ function! smartfinder#error_msg(msg)
 endfunction
 
 
+function! s:global_option(key)
+  return g:smartfinder_options.global[a:key]
+endfunction
+
+
 function! s:exists_prompt(line)
-  return strlen(a:line) >= s:prompt_len &&
-        \ a:line[: s:prompt_len - 1] ==# s:prompt
+  return strlen(a:line) >= s:options.prompt_len &&
+        \ a:line[: s:options.prompt_len - 1] ==# s:options.prompt
 endfunction
 
 
 function! s:remove_prompt(line)
-  return s:exists_prompt(a:line) ? a:line[s:prompt_len :] : a:line
+  return s:exists_prompt(a:line) ? a:line[s:options.prompt_len :] : a:line
 endfunction
 
 
 function! s:restore_prompt(line)
   let len = strlen(a:line)
   let i = 0
-  while i < s:prompt_len && i < len && s:prompt[i] ==# a:line[i]
+  while i < s:options.prompt_len &&
+        \ i < len &&
+        \ s:options.prompt[i] ==# a:line[i]
     let i += 1
   endwhile
-  call setline(1, s:prompt . a:line[i :])
-  call feedkeys(repeat("\<Right>", s:prompt_len - i), 'n')
+  call setline('.', s:options.prompt . a:line[i :])
+  call feedkeys(repeat("\<Right>", s:options.prompt_len - i), 'n')
 endfunction
 
 
@@ -173,15 +196,164 @@ function! s:on_cursor_moved_i()
     return
   endif
 
-  if col <= s:prompt_len
-    call feedkeys(repeat("\<Right>", s:prompt_len - col + 1), 'n')
+  call s:add_history(s:remove_prompt(line))
+
+  if col <= s:options.prompt_len
+    call feedkeys(repeat("\<Right>", s:options.prompt_len - col + 1), 'n')
     return
   endif
 
-  if col > strlen(line) && col != s:last_col
-    let s:last_col = col
+  if col > strlen(line) && col != s:options.last_col
+    let s:options.last_col = col
     call feedkeys("\<C-x>\<C-o>", 'n')
     return
+  endif
+endfunction
+
+
+function! s:history_file_name()
+  return expand(s:global_option('history_file'))
+endfunction
+
+
+function! s:normalize_history()
+  if !s:empty_history()
+    let history_list = s:options.user_input_history[s:options.mode_name]
+    if strlen(history_list[0]) < 1
+      call remove(history_list, 0)
+    endif
+    let max_mode_history = s:global_option('max_mode_history')
+    if len(history_list) > max_mode_history
+      call remove(history_list, max_mode_history, -1)
+    endif
+  endif
+endfunction
+
+
+function! s:add_history(input_string)
+  if s:empty_history()
+    let s:options.user_input_history[s:options.mode_name] = []
+  endif
+  let history_list = s:options.user_input_history[s:options.mode_name]
+  if s:options.show_input_history_pos < 0 ||
+        \ history_list[s:options.show_input_history_pos] != a:input_string
+    if s:options.add_input_history
+      call insert(history_list, a:input_string, 0)
+      let s:options.add_input_history = 0
+    else
+      let history_list[0] = a:input_string
+    endif
+  endif
+endfunction
+
+
+function! s:load_history()
+  let result = {}
+  let filename = s:history_file_name()
+
+  try
+    if filereadable(filename)
+      for line in readfile(filename, '')
+        let columns = split(line, '\t')
+
+        if !has_key(result, columns[0])
+          let result[columns[0]] = []
+        endif
+
+        call add(result[columns[0]], columns[1]) 
+      endfor
+    endif
+  catch /.*/
+    let result = {}
+  endtry
+
+  return result
+endfunction
+
+
+function! s:save_history()
+  let filename = s:history_file_name()
+
+  try
+    let lines = []
+    for mode_name in
+          \ sort(keys(s:options.user_input_history),
+          \      'smartfinder#compare_string')
+      for hist in s:options.user_input_history[mode_name]
+        call add(lines, mode_name . "\t" . hist)
+      endfor
+    endfor
+
+    call writefile(lines, filename)
+  catch /.*/
+  endtry
+endfunction
+
+
+function! s:empty_history()
+  if !has_key(s:options.user_input_history, s:options.mode_name) ||
+        \ empty(s:options.user_input_history[s:options.mode_name])
+    return 1
+  endif
+  return 0
+endfunction
+
+
+function! smartfinder#switch_mode(mode_name, pattern)
+  call s:unmap_keys()
+  call s:invoke('terminate')
+
+  if s:options.mode_name !=# a:mode_name
+    call s:normalize_history()
+    let s:options.mode_name = a:mode_name
+    let s:options.add_input_history = 1
+    let s:options.show_input_history_pos = -1
+  endif
+  let s:options.last_col = -1
+
+  call s:invoke('initialize')
+  call s:initialize_mode_options()
+  call s:initialize_prompt()
+  call s:map_keys()
+  call setline('.', s:options.prompt . a:pattern)
+
+  call feedkeys("\<End>\<C-x>\<C-o>", 'n')
+endfunction
+
+
+function! smartfinder#compare_string(lhs, rhs)
+  let lhsl = char2nr(tolower(a:lhs))
+  let rhsl = char2nr(tolower(a:rhs))
+  return lhsl != rhsl ? (lhsl > rhsl ? 1 : -1)
+        \         : (char2nr(a:lhs) > char2nr(a:rhs) ? -1 : 1)
+endfunction
+
+
+function! smartfinder#previous_history()
+  if s:empty_history() ||
+        \ s:options.show_input_history_pos >=
+        \   len(s:options.user_input_history[s:options.mode_name]) - 1
+    return
+  endif
+  let history_list = s:options.user_input_history[s:options.mode_name]
+  let s:options.show_input_history_pos +=
+        \ (s:options.show_input_history_pos < 0 && len(history_list) > 1)
+        \ ? 2 : 1
+  call smartfinder#switch_mode(s:options.mode_name,
+        \                      history_list[s:options.show_input_history_pos])
+endfunction
+
+
+function! smartfinder#next_history()
+  if s:empty_history() || s:options.show_input_history_pos < 0
+    return
+  endif
+  let s:options.show_input_history_pos -= 1
+  if s:options.show_input_history_pos >= 0
+    let history_list = s:options.user_input_history[s:options.mode_name]
+    call smartfinder#switch_mode(
+          \ s:options.mode_name,
+          \ history_list[s:options.show_input_history_pos])
   endif
 endfunction
 
@@ -193,33 +365,142 @@ function! smartfinder#on_bs()
 endfunction
 
 
-function! smartfinder#map_plugin_keys()
-  inoremap <buffer> <Plug>SmartFinderOnBS
-        \ <C-r>=smartfinder#on_bs() ? '' : ''<CR>
-  inoremap <buffer> <Plug>SmartFinderCancel <Esc>
+function! smartfinder#select_action(item)
+  if empty(a:item)
+    call smartfinder#error_message('no input text')
+    return
+  endif
 
-  call s:do('map_plugin_keys')
+  let mode_option = g:smartfinder_options.mode[s:options.mode_name]
+  if !has_key(mode_option, 'action_key_table') ||
+        \ !has_key(mode_option, 'action_name_table') ||
+        \ empty(mode_option['action_key_table']) ||
+        \ empty(mode_option['action_name_table'])
+    return
+  endif
+
+  let action_key_table = mode_option['action_key_table']
+  let keys = sort(copy(keys(action_key_table)), 'smartfinder#compare_string')
+  let action_count = len(keys)
+  let key_names = map(copy(keys), 'strtrans(v:val)')
+  let max_key_width = max(map(copy(key_names), 'strlen(v:val)'))
+  let action_names = map(copy(keys), 'action_key_table[v:val]')
+  let max_action_width = max(map(copy(action_names), 'strlen(v:val)'))
+  let spacer_len = 2
+  let spacer = repeat(' ', spacer_len)
+  let max_column_count = max([(&columns + spacer_len) /
+	\ (max_key_width + 1 + max_action_width + spacer_len), 1])
+  let max_row_count = (action_count / max_column_count) +
+	\ (action_count % max_column_count ? 1 : 0)
+
+  redraw
+
+  let i = 0
+
+  echon a:item.word
+  echon "\n"
+  for row in range(max_row_count)
+    for column in range(max_column_count)
+      if i >= action_count
+	break
+      endif
+
+      echon repeat(' ', max_key_width - strlen(keys[i]))
+      echohl SpecialKey
+      echon keys[i]
+      echohl None
+      echon ' ' . action_names[i]
+      echon spacer . repeat(' ', max_action_width - strlen(action_names[i]))
+
+      let i += 1
+    endfor
+    echon "\n"
+  endfor
+
+  echon 'select an action: '
+  let key = nr2char(getchar())
+  redraw
+
+  if key == "\<Esc>" || key == "\<C-c>"
+    return
+  endif
+
+  if has_key(action_key_table, key)
+    let action_name_table = mode_option['action_name_table']
+    let function_name = action_name_table[action_key_table[key]]
+    call smartfinder#end()
+    call feedkeys("\<Esc>", 'n')
+    call feedkeys(call(function_name, [a:item]), 'n')
+  else
+    call smartfinder#error_message('no action')
+    return
+  endif
+endfunction
+
+
+function! s:map_keys()
+  call smartfinder#map_plugin_keys()
+  call s:invoke('map_plugin_keys')
+  let mode_option = g:smartfinder_options.mode[s:options.mode_name]
+  if has_key(mode_option, 'key_mapping_function') &&
+        \ !empty(mode_option['key_mapping_function'])
+    call call(mode_option['key_mapping_function'], [])
+  else
+    call s:invoke('map_default_keys')
+  endif
+endfunction
+
+
+function! s:unmap_keys()
+  let mode_option = g:smartfinder_options.mode[s:options.mode_name]
+  if has_key(mode_option, 'key_unmapping_function') &&
+        \ !empty(mode_option['key_unmapping_function'])
+    call call(mode_option['key_unmapping_function'], [])
+  else
+    call s:invoke('unmap_default_keys')
+  endif
+  call s:invoke('unmap_plugin_keys')
+  call smartfinder#unmap_plugin_keys()
+endfunction
+
+
+function! smartfinder#map_plugin_keys()
+  inoremap <buffer> <Plug>SmartFinderDeleteChar
+        \ <C-r>=smartfinder#on_bs() ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderPreviousHistory
+        \ <C-r>=smartfinder#previous_history() ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderNextHistory
+        \ <C-r>=smartfinder#next_history() ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderSelectAction
+        \ <C-r>=smartfinder#select_completion('smartfinder#select_action')
+        \ ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderCancel <Esc>
 endfunction
 
 
 function! smartfinder#unmap_plugin_keys()
-  call s:do('unmap_plugin_keys')
-  call smartfinder#safe_iunmap('<Plug>SmartFinderOnBS',
-        \                      '<Plug>SmartFinderCancel')
+  call smartfinder#safe_iunmap([
+        \ '<Plug>SmartFinderDeleteChar',
+        \ '<Plug>SmartFinderPreviousHistory',
+        \ '<Plug>SmartFinderNextHistory',
+        \ '<Plug>SmartFinderSelectAction',
+        \ '<Plug>SmartFinderCancel',
+        \])
 endfunction
 
 
 function! smartfinder#map_default_keys()
-  imap <buffer> <Esc> <Plug>SmartFinderCancel
+  imap <buffer> <BS> <Plug>SmartFinderDeleteChar
   imap <buffer> <C-c> <Plug>SmartFinderCancel
-  imap <buffer> <BS> <Plug>SmartFinderOnBS
-  imap <buffer> <C-h> <Plug>SmartFinderOnBS
-  inoremap <buffer> <C-l> <Nop>
+  imap <buffer> <C-h> <Plug>SmartFinderDeleteChar
+  imap <buffer> <C-j> <Plug>SmartFinderNextHistory
+  imap <buffer> <C-k> <Plug>SmartFinderPreviousHistory
+  imap <buffer> <C-l> <Plug>SmartFinderSelectAction
 endfunction
 
 
-function! smartfinder#safe_iunmap(...)
-  for key in a:000
+function! smartfinder#safe_iunmap(list)
+  for key in a:list
     execute 'inoremap <buffer> ' . key . ' <Nop>'
     execute 'iunmap <buffer> ' . key
   endfor
@@ -227,22 +508,26 @@ endfunction
 
 
 function! smartfinder#unmap_default_keys()
-  call smartfinder#safe_iunmap('<Esc>', '<C-c>', '<BS>', '<C-h>', '<C-l>')
+  call smartfinder#safe_iunmap([
+        \ '<BS>', '<C-c>', '<C-h>', '<C-i>',
+        \ '<C-j>', '<C-k>', '<C-l>', '<Tab>',
+        \])
 endfunction
 
 
 function! smartfinder#omnifunc(findstart, base)
   if a:findstart
-    return s:do('omnifunc', a:findstart, a:base)
+    return s:invoke('omnifunc', a:findstart, a:base)
   endif
 
-  let result = s:do('omnifunc', a:findstart, a:base)
+  let result = s:invoke('omnifunc', a:findstart, a:base)
 
-  "syntax clear
+  syntax clear
   if empty(result)
     syntax match Error /^.*$/
   else
-    execute printf('syntax match Statement /^\V%s/', escape(s:prompt, '\'))
+    execute printf('syntax match Statement /^\V%s/',
+          \        escape(s:options.prompt, '\'))
     call feedkeys("\<C-p>\<Down>", 'n')
   endif
   return result
@@ -262,9 +547,9 @@ function! s:get_user_input_string(function_name, args)
 endfunction
 
 
-function! s:get_select_item(str)
+function! s:get_selected_completion_item(str)
   let result = {}
-  for item in s:do('get_item_list')
+  for item in s:invoke('completion_list')
     if item.word ==# a:str
       let result = item
       break
@@ -275,8 +560,9 @@ function! s:get_select_item(str)
 endfunction
 
 
-function! smartfinder#action_handler(function_name)
-  if !s:get_user_input_string('smartfinder#action_handler', a:function_name)
+function! smartfinder#select_completion(function_name)
+  if !s:get_user_input_string('smartfinder#select_completion',
+        \                     a:function_name)
     return
   endif
 
@@ -285,7 +571,7 @@ function! smartfinder#action_handler(function_name)
   endif
 
   try
-    let item = s:get_select_item(s:user_input_string)
+    let item = s:get_selected_completion_item(s:user_input_string)
 
     call call(a:function_name, [item])
   finally
@@ -294,23 +580,125 @@ function! smartfinder#action_handler(function_name)
 endfunction
 
 
-function! smartfinder#command_complete(arglead, cmdline, cursorpos)
-  return join(
-        \  sort(
-        \    map(
-        \      split(
-        \        globpath(
-        \          &runtimepath,
-        \          'autoload/smartfinder/*.vim'
-        \        ),
-        \        "\n"
+function! smartfinder#fnameescape(fname)
+  let fname = ''
+
+  if has('win16') || has('win32') || has('win64')
+    if exists('*fnameescape')
+      let fname = fnameescape(a:fname)
+    else
+      let fname = escape(a:fname, " \t\n*?`%#'\"|!<")
+    endif
+
+    let fname = substitute(fname, '\\!', '!', 'g')
+    if fname =~ '\V\^\[+~]'
+      let fname = '.\' . fname
+    endif
+  else
+    if exists('*fnameescape')
+      let fname = fnameescape(a:fname)
+    else
+      let fname = escape(a:fname, " \t\n*?[{`$\\%#'\"|!<>")
+    endif
+
+    if fname =~ '\V\^\[+~]'
+      let fname = '\' . fname
+    endif
+  endif
+
+  return fname
+endfunction
+
+
+function! smartfinder#make_pattern(str)
+  let re = ''
+  if empty(a:str)
+    let re = '*'
+  else
+    for c in split(a:str, '\zs')
+      if c != '*' && c != '?'
+	let re .= '*'
+      endif
+      let re .= (c != '\' ? c : '/')
+    endfor
+  endif
+
+  let pair = [ [ '*', '\\.\\*' ], [ '?', '\\.' ] ]
+  if !empty(s:REGEX_SEPARATOR_PATTERN)
+    call add(pair, s:REGEX_SEPARATOR_PATTERN)
+  endif
+
+  for [pat, sub] in pair
+    let re = substitute(re, pat, sub, 'g')
+  endfor
+  return '\V' . re
+endfunction
+
+
+function! s:mode_list()
+  return sort(
+        \  map(
+        \    split(
+        \      globpath(
+        \        &runtimepath,
+        \        'autoload/smartfinder/*.vim'
         \      ),
-        \      'fnamemodify(v:val, ":t:r")'
-        \    )
+        \      "\n"
+        \    ),
+        \    'fnamemodify(v:val, ":t:r")'
         \  ),
-        \  "\n"
+        \  'smartfinder#compare_string'
         \)
 endfunction
+
+
+function! smartfinder#command_complete(arglead, cmdline, cursorpos)
+  return join(s:mode_list(), "\n")
+endfunction
+
+
+" global options
+if exists('g:smartfinder_options')
+  call extend(g:smartfinder_options, { 'global' : {}, 'mode' : {} }, 'keep')
+else
+  let g:smartfinder_options = { 'global' : {}, 'mode' : {} }
+endif
+let s:default_options = {
+      \ 'global' : {
+      \   'bufname' : '[smartfinder]',
+      \   'history_file' : '$HOME/.smartfinder_history',
+      \   'max_mode_history' : 20,
+      \ }
+      \}
+call map(s:default_options,
+      \ 'extend(g:smartfinder_options[v:key], v:val, "keep")')
+unlet s:default_options
+
+
+" local options
+if has('win16') || has('win32') || has('win64')
+  let s:REGEX_SEPARATOR_PATTERN = [ '/', '\\[\\/]' ]
+else
+  let s:REGEX_SEPARATOR_PATTERN = []
+endif
+if !exists('s:options')
+  let s:options = {}
+  let s:options.prompt = ''
+  let s:options.prompt_len = -1
+  let s:options.completeopt = ''
+  let s:options.ignorecase = ''
+  let s:options.smartcase = ''
+  let s:options.bufnr = -1
+  let s:options.winnr = -1
+  let s:options.new_window = 0
+  let s:options.last_col = -1
+  let s:options.activate_flag = 0
+  let s:options.mode_name = ''
+  let s:options.loaded_mode_options = {}
+  let s:options.user_input_history = s:load_history()
+  let s:options.add_input_history = -1
+  let s:options.show_input_history_pos = -1
+endif
 
 
 

@@ -1,7 +1,8 @@
 "-----------------------------------------------------------------------------
-" smartfinder - buffer
+" smartfinder - buffer mode
 " Author: ky
-" Version: 0.1.1
+" Version: 0.2
+" Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
 " License: The MIT License
 " The MIT License {{{
 "
@@ -27,51 +28,59 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-if has('win16') || has('win32') || has('win64')
-  let s:REGEX_SEPARATOR_PATTERN = [ '/', '\\[\\/]' ]
-else
-  let s:REGEX_SEPARATOR_PATTERN = []
-endif
-
-let s:MODE_NAME = expand('<sfile>:t:r')
-
-
-let s:cache_buflist = []
-
-
 function! smartfinder#buffer#options()
   let ACTION_KEY_TABLE = {
+        \ ':' : 'ex',
+        \ 'd' : 'bdelete',
+        \ 'h' : 'vert aboveleft',
+        \ 'H' : 'vert topleft',
+        \ 'j' : 'belowright',
+        \ 'J' : 'botright',
+        \ 'k' : 'aboveleft',
+        \ 'K' : 'topleft',
+        \ 'l' : 'vert belowright',
+        \ 'L' : 'vert botright',
         \ 'o' : 'open',
-        \ 'd' : 'delete',
-        \ 'D' : 'delete!',
         \}
   let ACTION_NAME_TABLE = {
-        \ 'open'    : 'smartfinder#buffer#action_open',
-        \ 'delete'  : 'smartfinder#buffer#action_delete',
-        \ 'delete!' : 'smartfinder#buffer#action_delete_f',
+        \ 'ex'              : s:SID . 'action_ex',
+        \ 'bdelete'         : s:SID . 'action_bdelete',
+        \ 'vert aboveleft'  : s:SID . 'action_vert_aboveleft',
+        \ 'vert topleft'    : s:SID . 'action_vert_topleft',
+        \ 'belowright'      : s:SID . 'action_belowright',
+        \ 'botright'        : s:SID . 'action_botright',
+        \ 'aboveleft'       : s:SID . 'action_aboveleft',
+        \ 'topleft'         : s:SID . 'action_topleft',
+        \ 'vert belowright' : s:SID . 'action_vert_belowright',
+        \ 'vert botright'   : s:SID . 'action_vert_botright',
+        \ 'open'            : s:SID . 'action_open',
         \}
   let DEFAULT_ACTION = 'open'
+  let MAP_KEYS_FUNCTION = 'smartfinder#buffer#map_default_keys'
+  let UNMAP_KEYS_FUNCTION = 'smartfinder#buffer#unmap_default_keys'
   let PROMPT = 'buffer>'
 
   return {
-        \ 'action_key_table'  : ACTION_KEY_TABLE,
-        \ 'action_name_table' : ACTION_NAME_TABLE,
-        \ 'default_action'    : DEFAULT_ACTION,
-        \ 'prompt'            : PROMPT,
+        \ 'action_key_table'    : ACTION_KEY_TABLE,
+        \ 'action_name_table'   : ACTION_NAME_TABLE,
+        \ 'default_action'      : DEFAULT_ACTION,
+        \ 'map_keys_function'   : MAP_KEYS_FUNCTION,
+        \ 'unmap_keys_function' : UNMAP_KEYS_FUNCTION,
+        \ 'prompt'              : PROMPT,
         \}
 endfunction
 
 
 function! s:get_option()
-  return g:SmartFinderOptions.Mode[s:MODE_NAME]
+  return g:smartfinder_options.mode[s:MODE_NAME]
 endfunction
 
 
-function! smartfinder#buffer#init()
+function! smartfinder#buffer#initialize()
   let last_bufnr = bufnr('$')
   let width = len(last_bufnr)
 
-  let s:cache_buflist = []
+  let s:buffer_completion_list = []
 
   for i in range(1, bufnr('$'))
     if bufexists(i) && buflisted(i)
@@ -79,7 +88,7 @@ function! smartfinder#buffer#init()
       if empty(bufname)
 	let bufname = '[no name] (#' . i . ')'
       endif
-      call add(s:cache_buflist, {
+      call add(s:buffer_completion_list, {
 	    \ 'word' : bufname,
 	    \ 'dup' : 1,
 	    \ 'bufnr' : i
@@ -89,61 +98,36 @@ function! smartfinder#buffer#init()
 endfunction
 
 
-function! smartfinder#buffer#get_item_list()
-  return s:cache_buflist
+function! smartfinder#buffer#terminate()
+  let s:buffer_completion_list = []
 endfunction
 
 
-function! s:make_pattern(str)
-  let re = ''
-  if empty(a:str)
-    let re = '*'
-  else
-    for c in split(a:str, '\zs')
-      if c != '*' && c != '?'
-	let re .= '*'
-      endif
-      let re .= (c != '\' ? c : '/')
-    endfor
-  endif
-
-  let pair = [ [ '*', '\\.\\*' ], [ '?', '\\.' ] ]
-  if !empty(s:REGEX_SEPARATOR_PATTERN)
-    call add(pair, s:REGEX_SEPARATOR_PATTERN)
-  endif
-
-  for [pat, sub] in pair
-    let re = substitute(re, pat, sub, 'g')
-  endfor
-  return '\V' . re
+function! smartfinder#buffer#completion_list()
+  return s:buffer_completion_list
 endfunction
 
 
 function! smartfinder#buffer#map_plugin_keys()
-  inoremap <buffer> <silent> <Plug>SmartFinderBufferOnCR
-        \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_cr')
-        \ ? '' : ''<CR>
-  inoremap <buffer> <silent> <Plug>SmartFinderBufferOnTab
-        \ <C-r>=smartfinder#action_handler('smartfinder#buffer#on_tab')
-        \ ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderBufferSelected
+        \ <C-r>=smartfinder#select_completion(
+        \ 'smartfinder#buffer#default_action') ? '' : ''<CR>
 endfunction
 
 
 function! smartfinder#buffer#unmap_plugin_keys()
-  call smartfinder#safe_iunmap('<Plug>SmartFinderBufferOnCR',
-        \                       '<Plug>SmartFinderBufferOnTab')
+  call smartfinder#safe_iunmap(['<Plug>SmartFinderBufferSelected'])
 endfunction
 
 
 function! smartfinder#buffer#map_default_keys()
   call smartfinder#map_default_keys()
-  imap <buffer> <CR>  <Plug>SmartFinderBufferOnCR
-  imap <buffer> <Tab> <Plug>SmartFinderBufferOnTab
+  imap <buffer> <CR>  <Plug>SmartFinderBufferSelected
 endfunction
 
 
 function! smartfinder#buffer#unmap_default_keys()
-  call smartfinder#safe_iunmap('<CR>', '<Tab>')
+  call smartfinder#safe_iunmap(['<CR>'])
   call smartfinder#unmap_default_keys()
 endfunction
 
@@ -153,8 +137,9 @@ function! smartfinder#buffer#omnifunc(findstart, base)
     return 0
   else
     let prompt_len = strlen(s:get_option()['prompt'])
-    let pattern = s:make_pattern(a:base[prompt_len :])
-    let result = filter(copy(s:cache_buflist), 'v:val.word =~ ' . string(pattern))
+    let pattern = smartfinder#make_pattern(a:base[prompt_len :])
+    let result = filter(copy(s:buffer_completion_list),
+          \             'v:val.word =~ ' . string(pattern))
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s'
     let num = 0
     for item in result
@@ -166,29 +151,9 @@ function! smartfinder#buffer#omnifunc(findstart, base)
 endfunction
 
 
-function! smartfinder#buffer#action_open(item)
-  return ':' . a:item.bufnr . 'buffer' . "\<CR>"
-endfunction
-
-
-function! smartfinder#buffer#action_delete(item)
-  return s:action_delete(a:item, '')
-endfunction
-
-
-function! smartfinder#buffer#action_delete_f(item)
-  return s:action_delete(a:item, '!')
-endfunction
-
-
-function! s:action_delete(item, bang)
-  return ':' . a:item.bufnr . 'bdelete' . a:bang . "\<CR>"
-endfunction
-
-
-function! smartfinder#buffer#on_cr(item)
+function! smartfinder#buffer#default_action(item)
   if empty(a:item)
-    call smartfinder#error_msg('no input text')
+    call smartfinder#error_message('no input text')
     return
   endif
 
@@ -200,70 +165,88 @@ function! smartfinder#buffer#on_cr(item)
 endfunction
 
 
-function! smartfinder#buffer#on_tab(item)
-  if empty(a:item)
-    call smartfinder#error_msg('no input text')
-    return
-  endif
-
-  let option = s:get_option()
-  let action_key_table = option['action_key_table']
-  let keys = sort(copy(keys(action_key_table)))
-  let action_count = len(keys)
-  let key_names = map(copy(keys), 'strtrans(v:val)')
-  let max_key_width = max(map(copy(key_names), 'strlen(v:val)'))
-  let action_names = map(copy(keys), 'action_key_table[v:val]')
-  let max_action_width = max(map(copy(action_names), 'strlen(v:val)'))
-  let spacer = repeat(' ', 2)
-  let spacer_len = strlen(spacer)
-  let max_column_count = max([(&columns + spacer_len) /
-	\ (max_key_width + 1 + max_action_width + spacer_len), 1])
-  let max_row_count = (action_count / max_column_count) +
-	\ (action_count % max_column_count ? 1 : 0)
-
-  redraw
-
-  let i = 0
-
-  echon a:item.word
-  echon "\n"
-  for row in range(max_row_count)
-    for column in range(max_column_count)
-      if i >= action_count
-	break
-      endif
-
-      echon repeat(' ', max_key_width - strlen(keys[i]))
-      echohl SpecialKey
-      echon keys[i]
-      echohl None
-      echon ' ' . action_names[i]
-      echon spacer . repeat(' ', max_action_width - strlen(action_names[i]))
-
-      let i += 1
-    endfor
-    echon "\n"
-  endfor
-
-  echon 'action?'
-  let key = nr2char(getchar())
-  redraw
-
-  if key == "\<Esc>" || key == "\<C-c>"
-    return
-  endif
-
-  if has_key(action_key_table, key)
-    let action_name_table = option['action_name_table']
-    let function_name = action_name_table[action_key_table[key]]
-    call smartfinder#end()
-    call feedkeys("\<Esc>", 'n')
-    call feedkeys(call(function_name, [a:item]), 'n')
-  else
-    call smartfinder#error_msg('no action')
-    return
-  endif
+function! s:sid_prefix()
+  return matchstr(expand('<sfile>'), '<SNR>\d\+_')
 endfunction
+
+
+function! s:do_open(open_cmd, item)
+  return printf(":%s #%d\<CR>", a:open_cmd, a:item.bufnr)
+endfunction
+
+
+function! s:create_action(info)
+  let function_name = printf('action_%s', a:info.name)
+  let template  = "function! s:%s(item)\n"
+  let template .= "  return %s\n"
+  let template .= "endfunction"
+  execute printf(template, function_name, a:info.action)
+endfunction
+
+
+function! s:create_buffer_actions()
+  let tbl = [
+        \
+        \ {
+        \   'name'   : 'ex',
+        \   'action' : 'printf(": %s\<C-b>",' .
+        \                     'smartfinder#fnameescape(a:item.word))'
+        \ },
+        \ {
+        \   'name'   : 'bdelete',
+        \   'action' : 'printf(":%dbdelete\<CR>", a:item.bufnr)',
+        \ },
+        \ {
+        \   'name'   : 'vert_aboveleft',
+        \   'action' : 's:do_open("vertical aboveleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_topleft',
+        \   'action' : 's:do_open("vertical topleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'belowright',
+        \   'action' : 's:do_open("belowright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'botright',
+        \   'action' : 's:do_open("botright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'aboveleft',
+        \   'action' : 's:do_open("aboveleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'topleft',
+        \   'action' : 's:do_open("topleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_belowright',
+        \   'action' : 's:do_open("vertical belowright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_botright',
+        \   'action' : 's:do_open("vertical botright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'open',
+        \   'action' : 'printf(":%dbuffer\<CR>", a:item.bufnr)'
+        \ },
+        \]
+
+  for v in tbl
+    call s:create_action(v)
+  endfor
+endfunction
+
+
+let s:buffer_completion_list = []
+
+let s:MODE_NAME = expand('<sfile>:t:r')
+let s:SID = s:sid_prefix()
+call s:create_buffer_actions()
+
+
 
 
 " vim: expandtab shiftwidth=2 softtabstop=2 foldmethod=marker

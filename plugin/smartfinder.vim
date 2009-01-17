@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder
 " Author: ky
-" Version: 0.1
+" Version: 0.2
 " License: The MIT License
 " The MIT License {{{
 "
@@ -32,38 +32,15 @@ if (exists('g:loaded_smartfinder') && g:loaded_smartfinder) ||
   finish
 endif
 
-
 let g:loaded_smartfinder = 1
-
 
 let s:cpoptions = &cpoptions
 set cpoptions&vim
 
 
-
-
-" global options
-if exists('g:SmartFinderOptions')
-  call extend(g:SmartFinderOptions, { 'Global' : {}, 'Mode' : {} }, 'keep')
-else
-  let g:SmartFinderOptions = { 'Global' : {}, 'Mode' : {} }
-endif
-
-let s:default_options = { 'Global' : {} }
-let s:default_options.Global.bufname = '[smartfinder]'
-
-call map(s:default_options,
-      \ 'extend(g:SmartFinderOptions[v:key], v:val, "keep")')
-unlet s:default_options
-
-
-
-
 " commands
 command! -nargs=1 -complete=custom,smartfinder#command_complete SmartFinder
       \ call smartfinder#start(<q-args>)
-
-
 
 
 let &cpoptions = s:cpoptions

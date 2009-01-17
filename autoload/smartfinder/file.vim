@@ -1,7 +1,8 @@
 "-----------------------------------------------------------------------------
-" smartfinder - file
+" smartfinder - file mode
 " Author: ky
-" Version: 0.1.1
+" Version: 0.2
+" Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
 " License: The MIT License
 " The MIT License {{{
 "
@@ -27,18 +28,6 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-let s:ESCAPE_KEY = '\'
-let s:MODE_NAME = expand('<sfile>:t:r')
-
-let s:SEPARATOR = '/'
-let s:DIR_PATTERN = '\V\^\.\*' . s:SEPARATOR
-let s:NO_FILENAME_PATTERN = '\V\^\.\*' . s:SEPARATOR . '\$'
-let s:DRIVE_LETTER_PATTERN = '\V\^\.\{-}' . s:SEPARATOR
-
-let s:cache_filelist = []
-let s:last_input_string = ''
-
-
 function! smartfinder#file#options()
   let ABSOLUTE_PATH_PATTERN = [ '\V\^\[$~' . s:SEPARATOR . ']' ]
   if has('win16') || has('win32') || has('win64')
@@ -46,41 +35,65 @@ function! smartfinder#file#options()
   endif
 
   let ACTION_KEY_TABLE = {
+        \ ':' : 'ex',
+        \ 'h' : 'vert aboveleft',
+        \ 'H' : 'vert topleft',
+        \ 'j' : 'belowright',
+        \ 'J' : 'botright',
+        \ 'k' : 'aboveleft',
+        \ 'K' : 'topleft',
+        \ 'l' : 'vert belowright',
+        \ 'L' : 'vert botright',
         \ 'o' : 'open',
-        \ 'O' : 'open!',
         \}
-
   let ACTION_NAME_TABLE = {
-        \ 'open'  : 'smartfinder#file#action_open',
-        \ 'open!' : 'smartfinder#file#action_open_f',
+        \ 'ex'              : s:SID . 'action_ex',
+        \ 'vert aboveleft'  : s:SID . 'action_vert_aboveleft',
+        \ 'vert topleft'    : s:SID . 'action_vert_topleft',
+        \ 'belowright'      : s:SID . 'action_belowright',
+        \ 'botright'        : s:SID . 'action_botright',
+        \ 'aboveleft'       : s:SID . 'action_aboveleft',
+        \ 'topleft'         : s:SID . 'action_topleft',
+        \ 'vert belowright' : s:SID . 'action_vert_belowright',
+        \ 'vert botright'   : s:SID . 'action_vert_botright',
+        \ 'open'            : s:SID . 'action_open',
         \}
-
   let DEFAULT_ACTION = 'open'
+  let KEY_MAPPING_FUNCTION = 'smartfinder#file#map_default_keys'
+  let KEY_UNMAPPING_FUNCTION = 'smartfinder#file#unmap_default_keys'
   let PROMPT = 'file>'
 
   return {
-        \ 'absolute_path_pattern' : ABSOLUTE_PATH_PATTERN,
-        \ 'action_key_table'      : ACTION_KEY_TABLE,
-        \ 'action_name_table'     : ACTION_NAME_TABLE,
-        \ 'default_action'        : DEFAULT_ACTION,
-        \ 'prompt'                : PROMPT,
+        \ 'absolute_path_pattern'  : ABSOLUTE_PATH_PATTERN,
+        \ 'action_key_table'       : ACTION_KEY_TABLE,
+        \ 'action_name_table'      : ACTION_NAME_TABLE,
+        \ 'default_action'         : DEFAULT_ACTION,
+        \ 'key_mapping_function'   : KEY_MAPPING_FUNCTION,
+        \ 'key_unmapping_function' : KEY_UNMAPPING_FUNCTION,
+        \ 'prompt'                 : PROMPT,
         \}
 endfunction
 
 
 function! s:get_option()
-  return g:SmartFinderOptions.Mode[s:MODE_NAME]
+  return g:smartfinder_options.mode[s:MODE_NAME]
 endfunction
 
 
-function! smartfinder#file#init()
-  let s:cache_filelist = []
+function! smartfinder#file#initialize()
+  let s:file_completion_list = []
   let s:last_input_string = ''
+  let s:update_filelist = 1
 endfunction
 
 
-function! smartfinder#file#get_item_list()
-  return s:cache_filelist
+function! smartfinder#file#terminate()
+  let s:file_completion_list = []
+endfunction
+
+
+function! smartfinder#file#completion_list()
+  return s:file_completion_list
 endfunction
 
 
@@ -113,7 +126,7 @@ function! s:make_relative_dir_pattern(dir)
         endif
         let wi .= (c =~ '\V\[a-zA-Z_/()-]'
               \    ? c
-              \    : '[' . (c != '`' ? c : '\' . c) . ']')
+              \    : '[' . (c !~ '\V\[`{}]' ? c : '\' . c) . ']')
       else
         let wi .= c
         if c == '*'
@@ -173,30 +186,25 @@ endfunction
 
 
 function! smartfinder#file#map_plugin_keys()
-  inoremap <buffer> <Plug>SmartFinderFileOnCR
-        \ <C-r>=smartfinder#action_handler('smartfinder#file#on_cr')
-        \ ? '' : ''<CR>
-  inoremap <buffer> <Plug>SmartFinderFileOnTab
-        \ <C-r>=smartfinder#action_handler('smartfinder#file#on_tab')
-        \ ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderFileSelected
+        \ <C-r>=smartfinder#select_completion(
+        \ 'smartfinder#file#default_action') ? '' : ''<CR>
 endfunction
 
 
 function! smartfinder#file#unmap_plugin_keys()
-  call smartfinder#safe_iunmap('<Plug>SmartFinderFileOnCR',
-        \                      '<Plug>SmartFinderFileOnTab')
+  call smartfinder#safe_iunmap(['<Plug>SmartFinderFileSelected'])
 endfunction
 
 
 function! smartfinder#file#map_default_keys()
   call smartfinder#map_default_keys()
-  imap <buffer> <CR>  <Plug>SmartFinderFileOnCR
-  imap <buffer> <Tab> <Plug>SmartFinderFileOnTab
+  imap <buffer> <CR>  <Plug>SmartFinderFileSelected
 endfunction
 
 
 function! smartfinder#file#unmap_default_keys()
-  call smartfinder#safe_iunmap('<CR>', '<Tab>')
+  call smartfinder#safe_iunmap(['<CR>'])
   call smartfinder#unmap_default_keys()
 endfunction
 
@@ -218,25 +226,27 @@ endfunction
 
 
 function! smartfinder#file#omnifunc(findstart, base)
-  let prompt_len = strlen(s:get_option()['prompt'])
-
   if a:findstart
     return 0
   else
+    let option = s:get_option()
+    let prompt_len = strlen(option['prompt'])
     let base = a:base[prompt_len :]
     let dir = matchstr(base, s:DIR_PATTERN)
     let fname = base[strlen(dir) :]
     let show_dot_files = fname =~ '\V\^.\$'
     let diff_str = s:last_input_string[strlen(base) :]
 
-    if show_dot_files ||
+    if s:update_filelist ||
+          \ show_dot_files ||
           \ strlen(base) < 1 ||
           \ base =~ s:NO_FILENAME_PATTERN ||
           \ diff_str =~ s:NO_FILENAME_PATTERN
-      let s:cache_filelist = []
+      let s:update_filelist = 0
+      let s:file_completion_list = []
       
       let abs = 0
-      for absolute_path_pattern in s:get_option()['absolute_path_pattern']
+      for absolute_path_pattern in option['absolute_path_pattern']
         if base =~ absolute_path_pattern
           let abs = 1
           break
@@ -251,7 +261,7 @@ function! smartfinder#file#omnifunc(findstart, base)
 
       if has('win16') || has('win32') || has('win64')
         for i in items
-          call add(s:cache_filelist,
+          call add(s:file_completion_list,
                 \  {
                 \    'word' : substitute(i, '\', s:SEPARATOR, 'g'),
                 \    'dup' : 0
@@ -260,9 +270,13 @@ function! smartfinder#file#omnifunc(findstart, base)
         endfor
       else
         for i in items
-          call add(s:cache_filelist, { 'word' : i, 'dup' : 0 })
+          call add(s:file_completion_list, { 'word' : i, 'dup' : 0 })
         endfor
       endif
+    endif
+
+    if empty(s:file_completion_list)
+      return []
     endif
 
     let s:last_input_string = base
@@ -270,7 +284,7 @@ function! smartfinder#file#omnifunc(findstart, base)
     let fname_pattern = s:make_regex_pattern(fname)
     let filter_cond =
           \ 's:extract_filename(v:val.word) =~? ' . string(fname_pattern)
-    let result = filter(copy(s:cache_filelist), filter_cond)
+    let result = filter(copy(s:file_completion_list), filter_cond)
     let num = 0
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s%s'
     for item in result
@@ -283,54 +297,9 @@ function! smartfinder#file#omnifunc(findstart, base)
 endfunction
 
 
-function! s:fnameescape(fname)
-  let fname = ''
-
-  if has('win16') || has('win32') || has('win64')
-    if exists('*fnameescape')
-      let fname = fnameescape(a:fname)
-    else
-      let fname = escape(a:fname, " \t\n*?`%#'\"|!<")
-    endif
-
-    let fname = substitute(fname, '\\!', '!', 'g')
-    if fname =~ '\V\^\[+~]'
-      let fname = '.\' . fname
-    endif
-  else
-    if exists('*fnameescape')
-      let fname = fnameescape(a:fname)
-    else
-      let fname = escape(a:fname, " \t\n*?[{`$\\%#'\"|!<>")
-    endif
-
-    if fname =~ '\V\^\[+~]'
-      let fname = '\' . fname
-    endif
-  endif
-
-  return fname
-endfunction
-
-
-function! s:action_open(item, bang)
-  return ':edit' . a:bang . ' ' . s:fnameescape(a:item.word) . "\<CR>"
-endfunction
-
-
-function! smartfinder#file#action_open(item)
-  return s:action_open(a:item, '')
-endfunction
-
-
-function! smartfinder#file#action_open_f(item)
-  return s:action_open(a:item, '!')
-endfunction
-
-
-function! smartfinder#file#on_cr(item)
+function! smartfinder#file#default_action(item)
   if empty(a:item)
-    call smartfinder#error_msg('no input text')
+    call smartfinder#error_message('no input text')
     return
   endif
 
@@ -342,71 +311,91 @@ function! smartfinder#file#on_cr(item)
 endfunction
 
 
-" test
-function! smartfinder#file#on_tab(item)
-  if empty(a:item)
-    call smartfinder#error_msg('no input text')
-    return
-  endif
-
-  let option = s:get_option()
-  let action_key_table = option['action_key_table']
-  let keys = sort(copy(keys(action_key_table)))
-  let action_count = len(keys)
-  let key_names = map(copy(keys), 'strtrans(v:val)')
-  let max_key_width = max(map(copy(key_names), 'strlen(v:val)'))
-  let action_names = map(copy(keys), 'action_key_table[v:val]')
-  let max_action_width = max(map(copy(action_names), 'strlen(v:val)'))
-  let spacer = repeat(' ', 2)
-  let spacer_len = strlen(spacer)
-  let max_column_count = max([(&columns + spacer_len) /
-        \ (max_key_width + 1 + max_action_width + spacer_len), 1])
-  let max_row_count = (action_count / max_column_count) +
-        \ (action_count % max_column_count ? 1 : 0)
-
-  redraw
-
-  let i = 0
-
-  echon a:item.word
-  echon "\n"
-  for row in range(max_row_count)
-    for column in range(max_column_count)
-      if i >= action_count
-        break
-      endif
-
-      echon repeat(' ', max_key_width - strlen(keys[i]))
-      echohl SpecialKey
-      echon keys[i]
-      echohl None
-      echon ' ' . action_names[i]
-      echon spacer . repeat(' ', max_action_width - strlen(action_names[i]))
-
-      let i += 1
-    endfor
-    echon "\n"
-  endfor
-
-  echon 'action?'
-  let key = nr2char(getchar())
-  redraw
-
-  if key == "\<Esc>" || key == "\<C-c>"
-    return
-  endif
-
-  if has_key(action_key_table, key)
-    let action_name_table = option['action_name_table']
-    let function_name = action_name_table[action_key_table[key]]
-    call smartfinder#end()
-    call feedkeys("\<Esc>", 'n')
-    call feedkeys(call(function_name, [a:item]), 'n')
-  else
-    call smartfinder#error_msg('no action')
-    return
-  endif
+function! s:sid_prefix()
+  return matchstr(expand('<sfile>'), '<SNR>\d\+_')
 endfunction
+
+
+function! s:do_open(open_cmd, item)
+  return printf(":%s %s\<CR>",
+        \       a:open_cmd, smartfinder#fnameescape(a:item.word))
+endfunction
+
+
+function! s:create_action(info)
+  let function_name = printf('action_%s', a:info.name)
+  let template  = "function! s:%s(item)\n"
+  let template .= "  return %s\n"
+  let template .= "endfunction"
+  execute printf(template, function_name, a:info.action)
+endfunction
+
+
+function! s:create_file_actions()
+  let tbl = [
+        \ {
+        \   'name'   : 'ex',
+        \   'action' : 'printf(": %s\<C-b>",' .
+        \                     'smartfinder#fnameescape(a:item.word))'
+        \ },
+        \ {
+        \   'name'   : 'vert_aboveleft',
+        \   'action' : 's:do_open("vertical aboveleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_topleft',
+        \   'action' : 's:do_open("vertical topleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'belowright',
+        \   'action' : 's:do_open("belowright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'botright',
+        \   'action' : 's:do_open("botright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'aboveleft',
+        \   'action' : 's:do_open("aboveleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'topleft',
+        \   'action' : 's:do_open("topleft split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_belowright',
+        \   'action' : 's:do_open("vertical belowright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'vert_botright',
+        \   'action' : 's:do_open("vertical botright split", a:item)'
+        \ },
+        \ {
+        \   'name'   : 'open',
+        \   'action' : 's:do_open("edit", a:item)'
+        \ },
+        \]
+
+  for v in tbl
+    call s:create_action(v)
+  endfor
+endfunction
+
+
+let s:file_completion_list = []
+let s:last_input_string = ''
+let s:update_filelist = -1
+
+let s:ESCAPE_KEY = '\'
+let s:MODE_NAME = expand('<sfile>:t:r')
+let s:SEPARATOR = '/'
+let s:DIR_PATTERN = '\V\^\.\*' . s:SEPARATOR
+let s:NO_FILENAME_PATTERN = '\V\^\.\*' . s:SEPARATOR . '\$'
+let s:DRIVE_LETTER_PATTERN = '\V\^\.\{-}' . s:SEPARATOR
+let s:SID = s:sid_prefix()
+call s:create_file_actions()
+
+
 
 
 " vim: expandtab shiftwidth=2 softtabstop=2 foldmethod=marker
