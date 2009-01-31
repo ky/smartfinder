@@ -3,10 +3,10 @@
 " Author: ky
 " Version: 0.1
 " Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
-" License: The MIT License
-" The MIT License {{{
+" License: The MIT License {{{
+" The MIT License
 "
-" Copyright (C) 2008 ky
+" Copyright (C) 2009 ky
 "
 " Permission is hereby granted, free of charge, to any person obtaining a
 " copy of this software and associated documentation files (the "Software"),
@@ -28,7 +28,7 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-function! smartfinder#bookmark#initialize()
+function! smartfinder#bookmark#initialize(...)
   let list = s:get_option()['bookmark_list']
   if empty(list)
     call smartfinder#error_message(
@@ -37,33 +37,29 @@ function! smartfinder#bookmark#initialize()
   endif
 
   for [name, path] in list
-    call add(s:bookmark_completion_list,
+    call add(s:completion_list,
           \  { 'word' : name, 'dup' : 0, 'path' : path })
   endfor
 endfunction
 
 
 function! smartfinder#bookmark#terminate()
-  let s:bookmark_completion_list = []
+  let s:completion_list = []
 endfunction
 
 
 function! smartfinder#bookmark#options()
-  let KEY_MAPPING_FUNCTION = 'smartfinder#bookmark#map_default_keys'
-  let KEY_UNMAPPING_FUNCTION = 'smartfinder#bookmark#unmap_default_keys'
-  let PROMPT = 'bookmark>'
-
   return {
-        \ 'key_mapping_function'   : KEY_MAPPING_FUNCTION,
-        \ 'key_unmapping_function' : KEY_UNMAPPING_FUNCTION,
-        \ 'bookmark_list'          : [],
-        \ 'prompt'                 : PROMPT,
+        \ 'key_mappings'   : 'smartfinder#bookmark#map_mode_keys',
+        \ 'key_unmappings' : 'smartfinder#bookmark#unmap_mode_keys',
+        \ 'bookmark_list'  : [],
+        \ 'prompt'         : 'bookmark>',
         \}
 endfunction
 
 
 function! smartfinder#bookmark#completion_list()
-  return s:bookmark_completion_list
+  return s:completion_list
 endfunction
 
 
@@ -75,19 +71,17 @@ endfunction
 
 
 function! smartfinder#bookmark#unmap_plugin_keys()
-  call smartfinder#safe_iunmap(['<Plug>SmartFinderBookmarkSelected'])
+  call smartfinder#safe_iunmap('<Plug>SmartFinderBookmarkSelected')
 endfunction
 
 
-function! smartfinder#bookmark#map_default_keys()
-  call smartfinder#map_default_keys()
+function! smartfinder#bookmark#map_mode_keys()
   imap <buffer> <CR> <Plug>SmartFinderBookmarkSelected
 endfunction
 
 
-function! smartfinder#bookmark#unmap_default_keys()
-  call smartfinder#safe_iunmap(['<CR>'])
-  call smartfinder#unmap_default_keys()
+function! smartfinder#bookmark#unmap_mode_keys()
+  call smartfinder#safe_iunmap('<CR>')
 endfunction
 
 
@@ -106,9 +100,9 @@ function! smartfinder#bookmark#omnifunc(findstart, base)
   if a:findstart
     return 0
   else
-    let prompt_len = strlen(s:get_option()['prompt'])
+    let prompt_len = len(s:get_option()['prompt'])
     let pattern = smartfinder#make_pattern(a:base[prompt_len :])
-    let result = filter(copy(s:bookmark_completion_list),
+    let result = filter(copy(s:completion_list),
           \             'v:val.word =~ ' . string(pattern))
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s'
     let num = 0
@@ -126,7 +120,7 @@ function! s:get_option()
 endfunction
 
 
-let s:bookmark_completion_list =  []
+let s:completion_list =  []
 let s:MODE_NAME = expand('<sfile>:t:r')
 let s:SEPARATOR = '/'
 

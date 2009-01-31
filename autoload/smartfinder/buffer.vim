@@ -3,10 +3,10 @@
 " Author: ky
 " Version: 0.2
 " Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
-" License: The MIT License
-" The MIT License {{{
+" License: The MIT License {{{
+" The MIT License
 "
-" Copyright (C) 2008 ky
+" Copyright (C) 2008-2009 ky
 "
 " Permission is hereby granted, free of charge, to any person obtaining a
 " copy of this software and associated documentation files (the "Software"),
@@ -56,17 +56,17 @@ function! smartfinder#buffer#options()
         \ 'open'            : s:SID . 'action_open',
         \}
   let DEFAULT_ACTION = 'open'
-  let MAP_KEYS_FUNCTION = 'smartfinder#buffer#map_default_keys'
-  let UNMAP_KEYS_FUNCTION = 'smartfinder#buffer#unmap_default_keys'
+  let KEY_MAPPINGS = 'smartfinder#buffer#map_mode_keys'
+  let KEY_UNMAPPINGS = 'smartfinder#buffer#unmap_mode_keys'
   let PROMPT = 'buffer>'
 
   return {
-        \ 'action_key_table'    : ACTION_KEY_TABLE,
-        \ 'action_name_table'   : ACTION_NAME_TABLE,
-        \ 'default_action'      : DEFAULT_ACTION,
-        \ 'map_keys_function'   : MAP_KEYS_FUNCTION,
-        \ 'unmap_keys_function' : UNMAP_KEYS_FUNCTION,
-        \ 'prompt'              : PROMPT,
+        \ 'action_key_table'  : ACTION_KEY_TABLE,
+        \ 'action_name_table' : ACTION_NAME_TABLE,
+        \ 'default_action'    : DEFAULT_ACTION,
+        \ 'key_mappings'      : KEY_MAPPINGS,
+        \ 'key_unmappings'    : KEY_UNMAPPINGS,
+        \ 'prompt'            : PROMPT,
         \}
 endfunction
 
@@ -76,11 +76,11 @@ function! s:get_option()
 endfunction
 
 
-function! smartfinder#buffer#initialize()
+function! smartfinder#buffer#initialize(...)
   let last_bufnr = bufnr('$')
   let width = len(last_bufnr)
 
-  let s:buffer_completion_list = []
+  let s:completion_list = []
 
   for i in range(1, bufnr('$'))
     if bufexists(i) && buflisted(i)
@@ -88,7 +88,7 @@ function! smartfinder#buffer#initialize()
       if empty(bufname)
 	let bufname = '[no name] (#' . i . ')'
       endif
-      call add(s:buffer_completion_list, {
+      call add(s:completion_list, {
 	    \ 'word' : bufname,
 	    \ 'dup' : 1,
 	    \ 'bufnr' : i
@@ -99,12 +99,12 @@ endfunction
 
 
 function! smartfinder#buffer#terminate()
-  let s:buffer_completion_list = []
+  let s:completion_list = []
 endfunction
 
 
 function! smartfinder#buffer#completion_list()
-  return s:buffer_completion_list
+  return s:completion_list
 endfunction
 
 
@@ -116,19 +116,17 @@ endfunction
 
 
 function! smartfinder#buffer#unmap_plugin_keys()
-  call smartfinder#safe_iunmap(['<Plug>SmartFinderBufferSelected'])
+  call smartfinder#safe_iunmap('<Plug>SmartFinderBufferSelected')
 endfunction
 
 
-function! smartfinder#buffer#map_default_keys()
-  call smartfinder#map_default_keys()
+function! smartfinder#buffer#map_mode_keys()
   imap <buffer> <CR>  <Plug>SmartFinderBufferSelected
 endfunction
 
 
-function! smartfinder#buffer#unmap_default_keys()
-  call smartfinder#safe_iunmap(['<CR>'])
-  call smartfinder#unmap_default_keys()
+function! smartfinder#buffer#unmap_mode_keys()
+  call smartfinder#safe_iunmap('<CR>')
 endfunction
 
 
@@ -136,9 +134,9 @@ function! smartfinder#buffer#omnifunc(findstart, base)
   if a:findstart
     return 0
   else
-    let prompt_len = strlen(s:get_option()['prompt'])
+    let prompt_len = len(s:get_option()['prompt'])
     let pattern = smartfinder#make_pattern(a:base[prompt_len :])
-    let result = filter(copy(s:buffer_completion_list),
+    let result = filter(copy(s:completion_list),
           \             'v:val.word =~ ' . string(pattern))
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s'
     let num = 0
@@ -240,7 +238,7 @@ function! s:create_buffer_actions()
 endfunction
 
 
-let s:buffer_completion_list = []
+let s:completion_list = []
 
 let s:MODE_NAME = expand('<sfile>:t:r')
 let s:SID = s:sid_prefix()

@@ -3,10 +3,10 @@
 " Author: ky
 " Version: 0.2
 " Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
-" License: The MIT License
-" The MIT License {{{
+" License: The MIT License {{{
+" The MIT License
 "
-" Copyright (C) 2008 ky
+" Copyright (C) 2008-2009 ky
 "
 " Permission is hereby granted, free of charge, to any person obtaining a
 " copy of this software and associated documentation files (the "Software"),
@@ -59,18 +59,18 @@ function! smartfinder#file#options()
         \ 'open'            : s:SID . 'action_open',
         \}
   let DEFAULT_ACTION = 'open'
-  let KEY_MAPPING_FUNCTION = 'smartfinder#file#map_default_keys'
-  let KEY_UNMAPPING_FUNCTION = 'smartfinder#file#unmap_default_keys'
+  let KEY_MAPPINGS = 'smartfinder#file#map_mode_keys'
+  let KEY_UNMAPPINGS = 'smartfinder#file#unmap_mode_keys'
   let PROMPT = 'file>'
 
   return {
-        \ 'absolute_path_pattern'  : ABSOLUTE_PATH_PATTERN,
-        \ 'action_key_table'       : ACTION_KEY_TABLE,
-        \ 'action_name_table'      : ACTION_NAME_TABLE,
-        \ 'default_action'         : DEFAULT_ACTION,
-        \ 'key_mapping_function'   : KEY_MAPPING_FUNCTION,
-        \ 'key_unmapping_function' : KEY_UNMAPPING_FUNCTION,
-        \ 'prompt'                 : PROMPT,
+        \ 'absolute_path_pattern' : ABSOLUTE_PATH_PATTERN,
+        \ 'action_key_table'      : ACTION_KEY_TABLE,
+        \ 'action_name_table'     : ACTION_NAME_TABLE,
+        \ 'default_action'        : DEFAULT_ACTION,
+        \ 'key_mappings'          : KEY_MAPPINGS,
+        \ 'key_unmappings'        : KEY_UNMAPPINGS,
+        \ 'prompt'                : PROMPT,
         \}
 endfunction
 
@@ -80,20 +80,23 @@ function! s:get_option()
 endfunction
 
 
-function! smartfinder#file#initialize()
-  let s:file_completion_list = []
+function! smartfinder#file#initialize(...)
+  if a:0 > 0 && a:1 == '--cache-clear'
+    let s:completion_cache = {}
+  endif
+  let s:completion_list = []
   let s:last_input_string = ''
   let s:update_filelist = 1
 endfunction
 
 
 function! smartfinder#file#terminate()
-  let s:file_completion_list = []
+  let s:completion_list = []
 endfunction
 
 
 function! smartfinder#file#completion_list()
-  return s:file_completion_list
+  return s:completion_list
 endfunction
 
 
@@ -101,6 +104,7 @@ function! s:make_relative_dir_pattern(dir)
   let wi = ''
   let escape = 0
   let star = 0
+  let sep = 1
 
   for c in split(a:dir, '\zs')
     if escape
@@ -118,7 +122,14 @@ function! s:make_relative_dir_pattern(dir)
       let wi .= s:ESCAPE_KEY
       let escape = 1
     else
-      if c != '*' && c != '?' && c != '.'
+      if c == '*' || c == '?' || (c == '.' && sep)
+        let wi .= c
+        if c == '*'
+          let star = 1
+        else
+          let star = 0
+        endif
+      else
         if star
           let star = 0
         else
@@ -127,13 +138,12 @@ function! s:make_relative_dir_pattern(dir)
         let wi .= (c =~ '\V\[a-zA-Z_/()-]'
               \    ? c
               \    : '[' . (c !~ '\V\[`{}]' ? c : '\' . c) . ']')
+      endif
+
+      if c == '/'
+        let sep = 1
       else
-        let wi .= c
-        if c == '*'
-          let star = 1
-        else
-          let star = 0
-        endif
+        let sep = 0
       endif
     endif
   endfor
@@ -144,7 +154,7 @@ endfunction
 
 function! s:make_absolute_dir_pattern(dir)
   let drive = matchstr(a:dir, s:DRIVE_LETTER_PATTERN)
-  return drive . s:make_relative_dir_pattern(a:dir[strlen(drive) :])
+  return drive . s:make_relative_dir_pattern(a:dir[len(drive) :])
 endfunction
 
 
@@ -193,19 +203,17 @@ endfunction
 
 
 function! smartfinder#file#unmap_plugin_keys()
-  call smartfinder#safe_iunmap(['<Plug>SmartFinderFileSelected'])
+  call smartfinder#safe_iunmap('<Plug>SmartFinderFileSelected')
 endfunction
 
 
-function! smartfinder#file#map_default_keys()
-  call smartfinder#map_default_keys()
+function! smartfinder#file#map_mode_keys()
   imap <buffer> <CR>  <Plug>SmartFinderFileSelected
 endfunction
 
 
-function! smartfinder#file#unmap_default_keys()
-  call smartfinder#safe_iunmap(['<CR>'])
-  call smartfinder#unmap_default_keys()
+function! smartfinder#file#unmap_mode_keys()
+  call smartfinder#safe_iunmap('<CR>')
 endfunction
 
 
@@ -230,52 +238,58 @@ function! smartfinder#file#omnifunc(findstart, base)
     return 0
   else
     let option = s:get_option()
-    let prompt_len = strlen(option['prompt'])
+    let prompt_len = len(option['prompt'])
     let base = a:base[prompt_len :]
     let dir = matchstr(base, s:DIR_PATTERN)
-    let fname = base[strlen(dir) :]
-    let show_dot_files = fname =~ '\V\^.\$'
-    let diff_str = s:last_input_string[strlen(base) :]
+    let fname = base[len(dir) :]
+    let show_dot_files = fname =~ '\V\^.'
+    let cache_key = show_dot_files . ':' . fnamemodify('.', ':p') . ':' . dir
 
-    if s:update_filelist ||
-          \ show_dot_files ||
-          \ strlen(base) < 1 ||
-          \ base =~ s:NO_FILENAME_PATTERN ||
-          \ diff_str =~ s:NO_FILENAME_PATTERN
-      let s:update_filelist = 0
-      let s:file_completion_list = []
-      
-      let abs = 0
-      for absolute_path_pattern in option['absolute_path_pattern']
-        if base =~ absolute_path_pattern
-          let abs = 1
-          break
+    if has_key(s:completion_cache, cache_key)
+      let s:completion_list = s:completion_cache[cache_key]
+    else
+      if s:update_filelist ||
+            \ show_dot_files ||
+            \ empty(base) ||
+            \ base =~ s:NO_FILENAME_PATTERN ||
+            \ s:last_input_string[len(base) :] =~ s:NO_FILENAME_PATTERN
+        let s:update_filelist = 0
+        let s:completion_list = []
+
+        let abs = 0
+        for absolute_path_pattern in option['absolute_path_pattern']
+          if base =~ absolute_path_pattern
+            let abs = 1
+            break
+          endif
+        endfor
+        if abs
+          let pattern = s:make_absolute_dir_pattern(dir)
+        else
+          let pattern = s:make_relative_dir_pattern(dir)
         endif
-      endfor
-      if abs
-        let pattern = s:make_absolute_dir_pattern(dir)
-      else
-        let pattern = s:make_relative_dir_pattern(dir)
-      endif
-      let items = s:create_filename_list(pattern, show_dot_files)
+        let items = s:create_filename_list(pattern, show_dot_files)
 
-      if has('win16') || has('win32') || has('win64')
-        for i in items
-          call add(s:file_completion_list,
-                \  {
-                \    'word' : substitute(i, '\', s:SEPARATOR, 'g'),
-                \    'dup' : 0
-                \  }
-                \)
-        endfor
-      else
-        for i in items
-          call add(s:file_completion_list, { 'word' : i, 'dup' : 0 })
-        endfor
+        if has('win16') || has('win32') || has('win64')
+          for i in items
+            call add(s:completion_list,
+                  \  {
+                  \    'word' : substitute(i, '\', s:SEPARATOR, 'g'),
+                  \    'dup' : 0
+                  \  }
+                  \)
+          endfor
+        else
+          for i in items
+            call add(s:completion_list, { 'word' : i, 'dup' : 0 })
+          endfor
+        endif
       endif
+
+      let s:completion_cache[cache_key] = s:completion_list
     endif
 
-    if empty(s:file_completion_list)
+    if empty(s:completion_list)
       return []
     endif
 
@@ -284,7 +298,7 @@ function! smartfinder#file#omnifunc(findstart, base)
     let fname_pattern = s:make_regex_pattern(fname)
     let filter_cond =
           \ 's:extract_filename(v:val.word) =~? ' . string(fname_pattern)
-    let result = filter(copy(s:file_completion_list), filter_cond)
+    let result = filter(copy(s:completion_list), filter_cond)
     let num = 0
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s%s'
     for item in result
@@ -376,13 +390,14 @@ function! s:create_file_actions()
         \ },
         \]
 
-  for v in tbl
-    call s:create_action(v)
-  endfor
+  call map(tbl, 's:create_action(v:val)')
 endfunction
 
 
-let s:file_completion_list = []
+if !exists('s:completion_cache')
+  let s:completion_cache = {}
+endif
+let s:completion_list = []
 let s:last_input_string = ''
 let s:update_filelist = -1
 

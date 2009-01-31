@@ -39,8 +39,8 @@ set cpoptions&vim
 
 
 " commands
-command! -nargs=1 -complete=custom,smartfinder#command_complete SmartFinder
-      \ call smartfinder#start(<q-args>)
+command! -nargs=+ -complete=custom,smartfinder#command_complete SmartFinder
+      \ call smartfinder#start(<f-args>)
 
 
 let &cpoptions = s:cpoptions
