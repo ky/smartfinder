@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder
 " Author: ky
-" Version: 0.2
+" Version: 0.2.1
 " License: The MIT License {{{
 " The MIT License
 "
@@ -31,10 +31,9 @@ function! smartfinder#start(mode, ...)
   let s:options.mode_name = a:mode
 
   call s:initialize()
-  call s:invoke_args('initialize', a:000)
-
   call s:initialize_mode_options()
   call s:initialize_prompt()
+  call s:invoke_args('initialize', a:000)
 
   if bufexists(s:options.bufnr)
     leftabove 1split
@@ -122,7 +121,7 @@ function! s:initialize_buffer()
   setlocal filetype=smartfinder
 
   " :help `=
-  file `=s:global_option('bufname')`
+  silent file `=s:global_option('bufname')`
   let s:options.bufnr = bufnr('%')
 
   augroup SmartFinderAugroup
@@ -315,7 +314,7 @@ function! s:empty_history()
 endfunction
 
 
-function! smartfinder#switch_mode(mode_name, pattern)
+function! smartfinder#switch_mode(mode_name, pattern, ...)
   call s:unmap_keys()
   call s:invoke('terminate')
 
@@ -327,7 +326,7 @@ function! smartfinder#switch_mode(mode_name, pattern)
   endif
   let s:options.last_col = -1
 
-  call s:invoke('initialize')
+  call s:invoke_args('initialize', a:000)
   call s:initialize_mode_options()
   call s:initialize_prompt()
   call s:map_keys()

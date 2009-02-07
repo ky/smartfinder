@@ -1,7 +1,7 @@
 "-----------------------------------------------------------------------------
 " smartfinder - file mode
 " Author: ky
-" Version: 0.2
+" Version: 0.2.1
 " Requirements: Vim 7.0 or later, smartfinder.vim 0.2 or later
 " License: The MIT License {{{
 " The MIT License
@@ -59,8 +59,10 @@ function! smartfinder#file#options()
         \ 'open'            : s:SID . 'action_open',
         \}
   let DEFAULT_ACTION = 'open'
+  let MRU_FILE = '$HOME/.smartfinder_file_mru'
   let KEY_MAPPINGS = 'smartfinder#file#map_mode_keys'
   let KEY_UNMAPPINGS = 'smartfinder#file#unmap_mode_keys'
+  let MAX_MRU = 50
   let PROMPT = 'file>'
 
   return {
@@ -68,8 +70,10 @@ function! smartfinder#file#options()
         \ 'action_key_table'      : ACTION_KEY_TABLE,
         \ 'action_name_table'     : ACTION_NAME_TABLE,
         \ 'default_action'        : DEFAULT_ACTION,
+        \ 'mru_file'              : MRU_FILE,
         \ 'key_mappings'          : KEY_MAPPINGS,
         \ 'key_unmappings'        : KEY_UNMAPPINGS,
+        \ 'max_mru'               : MAX_MRU,
         \ 'prompt'                : PROMPT,
         \}
 endfunction
@@ -81,22 +85,55 @@ endfunction
 
 
 function! smartfinder#file#initialize(...)
-  if a:0 > 0 && a:1 == '--cache-clear'
-    let s:completion_cache = {}
-  endif
   let s:completion_list = []
   let s:last_input_string = ''
+  let s:mru_show = 0
   let s:update_filelist = 1
+
+  if !exists('s:mru_list')
+    let s:mru_list = s:load_mru()
+  endif
+
+  augroup SmartFinderFileAugroup
+    autocmd!
+    autocmd VimLeave * call s:save_mru()
+  augroup END
+
+  if a:0 > 0
+    for o in a:000
+      if o == '--cache-clear'
+        let s:completion_cache = {}
+      elseif o == '--mru'
+        let s:mru_show = 1
+      endif
+    endfor
+  endif
+
+  if s:mru_show
+    let s:mru_completion_list = []
+    for fname in s:mru_list
+      if filereadable(fname)
+        let completion_item =
+              \ { 'word' : fnamemodify(fname, ':~:.'), 'dup' : 0 }
+        call add(s:mru_completion_list, completion_item) 
+      endif
+    endfor
+  endif
 endfunction
 
 
 function! smartfinder#file#terminate()
   let s:completion_list = []
+  let s:mru_completion_list = []
 endfunction
 
 
 function! smartfinder#file#completion_list()
-  return s:completion_list
+  if s:mru_show
+    return s:mru_completion_list
+  else
+    return s:completion_list
+  endif
 endfunction
 
 
@@ -199,21 +236,26 @@ function! smartfinder#file#map_plugin_keys()
   inoremap <buffer> <Plug>SmartFinderFileSelected
         \ <C-r>=smartfinder#select_completion(
         \ 'smartfinder#file#default_action') ? '' : ''<CR>
+  inoremap <buffer> <Plug>SmartFinderFileToggleMRU
+        \ <C-r>=smartfinder#file#toggle_mru() ? '' : ''<CR>
 endfunction
 
 
 function! smartfinder#file#unmap_plugin_keys()
   call smartfinder#safe_iunmap('<Plug>SmartFinderFileSelected')
+  call smartfinder#safe_iunmap('<Plug>SmartFinderFileToggleMRU')
 endfunction
 
 
 function! smartfinder#file#map_mode_keys()
   imap <buffer> <CR>  <Plug>SmartFinderFileSelected
+  imap <buffer> <Tab>  <Plug>SmartFinderFileToggleMRU
 endfunction
 
 
 function! smartfinder#file#unmap_mode_keys()
   call smartfinder#safe_iunmap('<CR>')
+  call smartfinder#safe_iunmap('<Tab>')
 endfunction
 
 
@@ -234,6 +276,14 @@ endfunction
 
 
 function! smartfinder#file#omnifunc(findstart, base)
+  if s:mru_show
+    return s:mru_omnifunc(a:findstart, a:base)
+  else
+    return s:file_omnifunc(a:findstart, a:base)
+endfunction
+
+
+function! s:file_omnifunc(findstart, base)
   if a:findstart
     return 0
   else
@@ -296,9 +346,8 @@ function! smartfinder#file#omnifunc(findstart, base)
     let s:last_input_string = base
 
     let fname_pattern = s:make_regex_pattern(fname)
-    let filter_cond =
-          \ 's:extract_filename(v:val.word) =~? ' . string(fname_pattern)
-    let result = filter(copy(s:completion_list), filter_cond)
+    let result = filter(copy(s:completion_list),
+          \ 's:extract_filename(v:val.word) =~? ' . string(fname_pattern))
     let num = 0
     let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s%s'
     for item in result
@@ -307,6 +356,84 @@ function! smartfinder#file#omnifunc(findstart, base)
             \ isdirectory(item.word) ? s:SEPARATOR : '')
     endfor
     return result
+  endif
+endfunction
+
+
+function! s:mru_omnifunc(findstart, base)
+  if a:findstart
+    return 0
+  else
+    let prompt_len = len(s:get_option()['prompt'])
+    let pattern = smartfinder#make_pattern(a:base[prompt_len :])
+    let result = filter(copy(s:mru_completion_list),
+          \             'v:val.word =~ ' . string(pattern))
+    let format = '%' . (prompt_len > 2 ? prompt_len - 2 : '') . 'd: %s'
+    let num = 0
+    for item in result
+      let num += 1
+      let item.abbr = printf(format, num, item.word)
+    endfor
+    return result
+  endif
+endfunction
+
+
+function! smartfinder#file#toggle_mru()
+  if s:mru_show
+    call smartfinder#switch_mode('file', '')
+  else
+    call smartfinder#switch_mode('file', '', '--mru')
+  endif
+endfunction
+
+
+function! s:mru_file_name()
+  return expand(s:get_option()['mru_file'])
+endfunction
+
+
+function! s:load_mru()
+  let result = []
+  let filename = s:mru_file_name()
+
+  try
+    if filereadable(filename)
+      for fname in readfile(filename, '')
+        if filereadable(fname)
+          call add(result, fname) 
+        endif
+      endfor
+    endif
+  catch /.*/
+    let result = []
+  endtry
+
+  return result
+endfunction
+
+
+function! s:save_mru()
+  try
+    call writefile(s:mru_list, s:mru_file_name())
+  catch /.*/
+  endtry
+endfunction
+
+
+function! s:add_mru(filename)
+  if has('win16') || has('win32') || has('win64')
+    let fullpath = fnamemodify(a:filename, ':p:gs?\\?' . s:SEPARATOR . '?')
+  else
+    let fullpath = fnamemodify(a:filename, ':p')
+  endif
+
+  call filter(s:mru_list, 'v:val !=# fullpath')
+  call insert(s:mru_list, fullpath, 0)
+
+  let max_mru = s:get_option()['max_mru']
+  if len(s:mru_list) > max_mru
+    call remove(s:mru_list, max_mru, -1)
   endif
 endfunction
 
@@ -331,6 +458,7 @@ endfunction
 
 
 function! s:do_open(open_cmd, item)
+  call s:add_mru(a:item.word)
   return printf(":%s %s\<CR>",
         \       a:open_cmd, smartfinder#fnameescape(a:item.word))
 endfunction
@@ -398,7 +526,9 @@ if !exists('s:completion_cache')
   let s:completion_cache = {}
 endif
 let s:completion_list = []
+let s:mru_completion_list = []
 let s:last_input_string = ''
+let s:mru_show = 0
 let s:update_filelist = -1
 
 let s:ESCAPE_KEY = '\'
