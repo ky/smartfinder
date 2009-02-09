@@ -326,9 +326,9 @@ function! smartfinder#switch_mode(mode_name, pattern, ...)
   endif
   let s:options.last_col = -1
 
-  call s:invoke_args('initialize', a:000)
   call s:initialize_mode_options()
   call s:initialize_prompt()
+  call s:invoke_args('initialize', a:000)
   call s:map_keys()
   call setline('.', s:options.prompt . a:pattern)
 
