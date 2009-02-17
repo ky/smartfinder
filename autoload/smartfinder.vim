@@ -38,7 +38,7 @@ function! smartfinder#start(mode, ...)
   if bufexists(s:options.bufnr)
     leftabove 1split
     let s:options.new_window = 1
-    silent execute s:options.bufnr . 'buffer'
+    silent! execute s:options.bufnr . 'buffer'
   else
     leftabove 1new
     let s:options.new_window = 1
@@ -47,7 +47,7 @@ function! smartfinder#start(mode, ...)
 
   call s:map_keys()
 
-  silent %delete _
+  silent! %delete _
   call setline('.', s:options.prompt)
   call feedkeys('A', 'n')
 endfunction
@@ -121,7 +121,7 @@ function! s:initialize_buffer()
   setlocal filetype=smartfinder
 
   " :help `=
-  silent file `=s:global_option('bufname')`
+  silent! file `=s:global_option('bufname')`
   let s:options.bufnr = bufnr('%')
 
   augroup SmartFinderAugroup
@@ -553,8 +553,10 @@ function! smartfinder#omnifunc(findstart, base)
   if empty(result)
     syntax match Error /^.*$/
   else
-    execute printf('syntax match Statement /^\V%s/',
-          \        escape(s:options.prompt, '\'))
+    execute printf(
+          \ 'syntax match Statement /^\V%s/',
+          \ escape(s:options.prompt, '\')
+          \)
     call feedkeys("\<C-p>\<Down>", 'n')
   endif
   return result
@@ -563,8 +565,10 @@ endfunction
 
 function! s:get_user_input_string(function_name, args)
   if pumvisible()
-    let str = printf("\<C-y>\<C-r>=%s(%s) ? '' : ''\<CR>",
-	  \ a:function_name, string(a:args))
+    let str = printf(
+          \ "\<C-y>\<C-r>=%s(%s) ? '' : ''\<CR>",
+	  \ a:function_name, string(a:args)
+          \)
     call feedkeys(str , 'n')
     return 0
   else

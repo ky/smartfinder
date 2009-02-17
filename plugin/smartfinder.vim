@@ -27,15 +27,18 @@
 " }}}
 "-----------------------------------------------------------------------------
 
-if (exists('g:loaded_smartfinder') && g:loaded_smartfinder) ||
-      \ &compatible || v:version < 700
+if &compatible || v:version < 700
   finish
 endif
 
-let g:loaded_smartfinder = 1
+if (exists('g:loaded_smartfinder') && g:loaded_smartfinder)
+  finish
+endif
 
 let s:cpoptions = &cpoptions
 set cpoptions&vim
+
+let g:loaded_smartfinder = 1
 
 
 " commands
