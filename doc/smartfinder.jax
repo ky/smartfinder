@@ -2,10 +2,10 @@
 
 Author: ky
 Version: 0.1.1
-License: The MIT License
-The MIT License {{{
+License: The MIT License {{{
+The MIT License
 
-Copyright (C) 2008 ky
+Copyright (C) 2008-2009 ky
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,10 +28,180 @@ THE SOFTWARE.
 
 
 ==============================================================================
-                                                    |smartfinder-introduction|
+目次
 
-Vim 7.0以上に対応しています。
-詳細は|smartfinder-buffer|または|smartfinder-file|を参照してください。
+1.はじめに			|smartfinder-introduction|
+2.コマンド			|smartfinder-commands|
+3.関数				|smartfinder-functions|
+4.キーマッピング		|smartfinder-key-mappings|
+5.カスタマイズ			|smartfinder-customizing|
+  5.1.グローバルオプション	  |smartfinder-global-options|
+  5.2.モードオプション		  |smartfinder-mode-options|
+6.更新履歴			|smartfinder-changelog|
+
+
+==============================================================================
+1.はじめに                                          *smartfinder-introduction*
+
+各モードを実行するためのインターフェースを提供しています。そのため、このプラグ
+イン単体では動作しません。モードは以下の種類があります。
+
+モード		説明 ~
+bookmark	お気に入りの選択(|smartfinder-bookmark|)
+buffer		バッファの選択(|smartfinder-buffer|)
+file		ファイルオープン(|smartfinder-file|)
+
+詳細は各モードを参照してください。
+
+このプラグインはVim 7.0以上に対応しています。
+最新バージョンは以下にあります。
+http://github.com/ky/smartfinder/
+
+
+==============================================================================
+2.コマンド                                              *smartfinder-commands*
+
+:Smartfinder {mode} [{arg}...]                                  *:Smartfinder*
+		モード{mode}を開始します。{arg}が指定されている場合、{mode}に
+		{arg}を渡します。{arg}がどのように処理されるかは、モード
+		{mode}のドキュメントを参照してください。
+		関連項目: |smartfinder#start()|
+
+
+==============================================================================
+3.関数                                                 *smartfinder-functions*
+
+smartfinder#get_option({key})                       *smartfinder#get_option()*
+		オプション{key}(g:smartfinder_options.global.{key})の値を取得
+		します。
+		例: >
+		    " g:smartfinder_options.global.bufnameの値を表示する
+		    :echo smartfinder#get_option('bufname')
+<
+smartfinder#get_mode_option({mode}, {key})     *smartfinder#get_mode_option()*
+		モード{mode}から、オプション{key}の値を取得します。
+		例: >
+		    " fileモードのオプションpromptの値を表示
+		    :echo smartfinder#get_mode_option('file', 'prompt')
+<
+smartfinder#safe_iunmap({key})                     *smartfinder#safe_iunmap()*
+		SmartFinderバッファローカルの{key}の定義を削除(iunmap)します。
+
+smartfinder#set_option({key}, {value})              *smartfinder#set_option()*
+		オプション{key}(g:smartfinder_options.global.{key})に{value}を
+		設定します。
+		例: >
+		    " bufnameを [sf] に変更
+		    :call smartfinder#set_option('bufname', '[sf]')
+<
+                                               *smartfinder#set_mode_option()*
+smartfinder#set_mode_option({mode}, {key}, {value})
+		モード{mode}のオプション{key}に{value}を設定します。
+		例: >
+		    " fileモードのpromptを > に変更
+		    :call smartfinder#set_mode_option('file', 'prompt', '>')
+<
+smartfinder#start({mode} [, {arg}...])                   *smartfinder#start()*
+		モード{mode}を開始します。{arg}が指定されている場合、{mode}に
+		{arg}を渡します。{arg}がどのように処理されるかは、モード
+		{mode}のドキュメントを参照してください。
+
+
+==============================================================================
+4.キーマッピング                                    *smartfinder-key-mappings*
+
+インサートモードのキーマッピングです。
+
+<Plug>SmartFinderCancel                              *<Plug>SmartFinderCancel*
+		終了します。
+
+<Plug>SmartFinderDeleteChar                      *<Plug>SmartFinderDeleteChar*
+		カーソルの前にある文字を1文字削除します。
+
+<Plug>SmartFinderNextHistory                    *<Plug>SmartFinderNextHistory*
+		入力したパターン履歴から、新しいパターンに置き換えます。
+
+<Plug>SmartFinderPreviousHistory            *<Plug>SmartFinderPreviousHistory*
+		入力したパターン履歴から、前回のパターンに置き換えます。
+
+<Plug>SmartFinderSelectAction                  *<Plug>SmartFinderSelectAction*
+		アクションリストが表示され、選択したアクションを実行します。
+		デフォルトでは使用できないモードがあります。
+
+		関連項目:
+		- |smartfinder-mode-option-action_key_table|
+		- |smartfinder-mode-option-action_name_table|
+		- |smartfinder-mode-option-default_action|
+
+
+==============================================================================
+5.カスタマイズ                                       *smartfinder-customizing*
+
+------------------------------------------------------------------------------
+5.1.グローバルオプション                          *smartfinder-global-options*
+
+                                        *g:smartfinder_options.global.bufname*
+g:smartfinder_options.global.bufname
+		バッファ名を指定します。
+		デフォルト：'[smartfinder]'
+
+                                   *g:smartfinder_options.global.history_file*
+g:smartfinder_options.global.history_file
+		各モードで入力したパターンの履歴を保存するファイルへのパスを
+		指定します。
+		デフォルト：'$HOME/.smartfinder_history'
+
+                                   *g:smartfinder_options.global.key_mappings*
+g:smartfinder_options.global.key_mappings
+		キー定義を行う関数名を指定します。何も設定されていない場合、
+		デフォルトのキー定義が適用されます。
+		デフォルト：''
+
+                                 *g:smartfinder_options.global.key_unmappings*
+g:smartfinder_options.global.key_unmappings
+		キー定義削除を行う関数名を指定します。何も設定されていない
+		場合、デフォルトのキー定義削除が適用されます。
+		デフォルト：''
+
+                               *g:smartfinder_options.global.max_mode_history*
+g:smartfinder_options.global.max_mode_history
+		各モードで入力されたパターンの履歴をいくつまで保存するか指定
+		します。
+		デフォルト：20
+
+
+------------------------------------------------------------------------------
+5.2.モードオプション                                *smartfinder-mode-options*
+
+                                                  *g:smartfinder_options.mode*
+g:smartfinder_options.mode
+		各モードのオプションを格納しています。
+		fileモードのpromptオプションの場合、下記のようになります。
+>
+		g:smartfinder_options.mode.file.prompt
+<
+		各モードのオプションには必須オプションとモード固有のオプショ
+		ンが存在します。モード固有のオプションについては、モードのド
+		キュメントを参照してください。
+
+                                    *smartfinder-mode-option-action_key_table*
+action_key_table
+                                   *smartfinder-mode-option-action_name_table*
+action_name_table
+                                      *smartfinder-mode-option-default_action*
+default_action
+                                        *smartfinder-mode-option-key_mappings*
+key_mappings
+                                      *smartfinder-mode-option-key_unmappings*
+key_unmappings
+                                       *smartfinder-mode-option-bookmark_list*
+bookmark_list
+                                              *smartfinder-mode-option-prompt*
+prompt
+
+
+==============================================================================
+6.更新履歴                                             *smartfinder-changelog*
 
 
 ==============================================================================

@@ -2,10 +2,10 @@
 
 Author: ky <ky.vim13@gmail.com>
 Version: 0.1.1
-License: The MIT License
-The MIT License {{{
+License: The MIT License {{{
+The MIT License
 
-Copyright (C) 2008 ky
+Copyright (C) 2008-2009 ky
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,7 +30,7 @@ THE SOFTWARE.
 ==============================================================================
 目次
 
-1.概要			|smartfinder-file-introduction|
+1.はじめに		|smartfinder-file-introduction|
 2.操作方法		|smartfinder-file-usage|
 
 

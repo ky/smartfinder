@@ -1,11 +1,11 @@
-*smartfinder-buffer.txt*  smartfinder バッファモード
+*smartfinder-bookmark.txt*  smartfinder ブックマークモード
 
 Author: ky <ky.vim13@gmail.com>
-Version: 0.1.1
+Version: 0.1
 License: The MIT License {{{
 The MIT License
 
-Copyright (C) 2008-2009 ky
+Copyright (C) 2009 ky
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -30,38 +30,21 @@ THE SOFTWARE.
 ==============================================================================
 目次
 
-1.概要			|smartfinder-buffer-introduction|
-2.操作方法		|smartfinder-buffer-usage|
+1.概要			|smartfinder-bookmark-introduction|
+2.操作方法		|smartfinder-bookmark-usage|
 
 
 ==============================================================================
-1.はじめに              *smartfinder-buffer-introduction* *smartfinder-buffer*
+1.はじめに          *smartfinder-bookmark-introduction* *smartfinder-bookmark*
 
-バッファ変更モードです。
+ブックマークモードです。
 以下のコマンドで起動します。 >
 
-      :SmartFinder buffer
+      :SmartFinder bookmark
 
 
 ==============================================================================
-2.操作方法                                          *smartfinder-buffer-usage*
-
-起動するとバッファの一覧がポップアップメニューに表示されます(補完候補)。
-文字を入力すると曖昧パターンに展開され、パターンにマッチした保管候補が
-表示されます。
-
-特殊文字として"/"、"\"、"?"があります。
-"/"を入力すると"/"または"\"にマッチします。
-同様に"\"を入力すると"/"または"\"にマッチします。
-"?"は何か1文字にマッチします。
-
-
-<CR>			選択したバッファをオープンします。
-
-<BS>			入力された文字を1文字削除します。
-
-<C-c>		または
-<Esc>			終了します。
+2.操作方法                                        *smartfinder-bookmark-usage*
 
 
 ==============================================================================
