@@ -459,8 +459,8 @@ endfunction
 
 function! s:do_open(open_cmd, item)
   call s:add_mru(a:item.word)
-  return printf(":%s %s\<CR>",
-        \       a:open_cmd, smartfinder#fnameescape(a:item.word))
+  return printf(":%s `=%s`\<CR>",
+        \       a:open_cmd, string(a:item.word))
 endfunction
 
 

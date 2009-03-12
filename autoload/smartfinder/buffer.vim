@@ -184,7 +184,6 @@ endfunction
 
 function! s:create_buffer_actions()
   let tbl = [
-        \
         \ {
         \   'name'   : 'ex',
         \   'action' : 'printf(": %s\<C-b>",' .
